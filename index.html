@@ -70,8 +70,18 @@
   <dialog id="detailsDialog"><div id="detailsContent"></div></dialog>
   <dialog id="priceDialog"><div id="priceContent"></div></dialog>
   <dialog id="settingsDialog"><div id="settingsContent"></div></dialog>
+  <dialog id="loginDialog">
+    <form id="loginForm">
+      <div class="dialog-head"><div><p class="eyebrow">כניסה מאובטחת</p><h2>המידע שלך, בכל מכשיר</h2></div></div>
+      <p>הזיני את כתובת המייל של איילת. יישלח אליה קישור חד־פעמי לכניסה — ללא סיסמה.</p>
+      <label>כתובת מייל<input name="email" type="email" required autocomplete="email" placeholder="name@example.com"></label>
+      <div class="dialog-actions"><button type="submit" class="primary">שליחת קישור כניסה</button></div>
+      <small>הנתונים נשמרים בענן רק לאחר כניסה.</small>
+    </form>
+  </dialog>
   <input id="restoreInput" type="file" accept="application/json" hidden>
   <div id="toast" role="status" aria-live="polite"></div>
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   <script src="app.js"></script>
 </body>
 </html>
