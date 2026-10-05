@@ -1,2 +1,5 @@
-# Ayelet-Miller-App
-Ayelet miller - client, booking &amp; agreement management
+# Ayelet Miller App
+
+אפליקציה מותאמת לנייד ולמחשב לניהול לקוחות, הזמנות והסכמי שירות.
+
+הנתונים נשמרים מקומית בדפדפן עד להפעלת החיבור המאובטח לענן. אין לשמור נתוני לקוחות אמיתיים במאגר GitHub.

@@ -1,0 +1,77 @@
+<!doctype html>
+<html lang="he" dir="rtl">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+  <meta name="theme-color" content="#87163C">
+  <meta name="description" content="ניהול לקוחות, הזמנות והסכמים — AYELET MILLER">
+  <title>AYELET MILLER — ניהול לקוחות והזמנות</title>
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='15' fill='%2387163C'/%3E%3Cpath d='M17 47 32 14l15 33M23 35h18' fill='none' stroke='white' stroke-width='5'/%3E%3C/svg%3E" type="image/svg+xml">
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <header class="topbar">
+    <div class="brand"><img src="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 160 160'%3E%3Cpath fill='none' stroke='%2387163C' stroke-width='5' stroke-linecap='round' d='M42 119C59 95 66 58 80 26c13 34 22 69 39 93M55 92h51'/%3E%3Ccircle cx='80' cy='80' r='67' fill='none' stroke='%2387163C' stroke-width='2'/%3E%3C/svg%3E" alt="AYELET MILLER"><div><b>AYELET MILLER</b><small>לקוחות, הזמנות והסכמים</small></div></div>
+    <button class="icon-btn" id="settingsBtn" aria-label="הגדרות">⚙</button>
+  </header>
+
+  <main>
+    <section class="hero">
+      <div><p id="todayLabel"></p><h1>בוקר טוב, איילת</h1></div>
+      <button class="primary" id="newBookingBtn">＋ הזמנה חדשה</button>
+    </section>
+
+    <section class="stats" id="stats"></section>
+
+    <section class="toolbar">
+      <label class="search"><span>⌕</span><input id="searchInput" type="search" placeholder="חיפוש לפי שם או טלפון"></label>
+      <select id="statusFilter" aria-label="סינון לפי סטטוס"><option value="">כל הסטטוסים</option><option>טיוטה</option><option>ממתינה לאישור</option><option>מאושרת</option><option>הושלמה</option><option>בוטלה</option></select>
+    </section>
+
+    <section class="panel">
+      <div class="section-head"><div><h2>אירועים קרובים</h2><p>כל מה שצריך לדעת במבט אחד</p></div></div>
+      <div id="bookingList" class="booking-list"></div>
+      <div id="emptyState" class="empty" hidden><strong>עדיין אין הזמנות</strong><span>הוסיפי הזמנה ראשונה כדי להתחיל</span></div>
+    </section>
+  </main>
+
+  <nav class="bottom-nav" aria-label="ניווט ראשי">
+    <button class="active" data-view="bookings">▦<span>הזמנות</span></button>
+    <button data-view="clients">♙<span>לקוחות</span></button>
+    <button id="backupBtn">⇩<span>גיבוי</span></button>
+    <button id="priceListBtn">₪<span>מחירון</span></button>
+  </nav>
+
+  <dialog id="bookingDialog">
+    <form id="bookingForm" method="dialog">
+      <div class="dialog-head"><div><p class="eyebrow">פרטי אירוע</p><h2 id="dialogTitle">הזמנה חדשה</h2></div><button type="button" class="close" data-close>×</button></div>
+      <input type="hidden" name="id">
+      <div class="form-grid">
+        <label>שם הלקוחה<input name="clientName" required autocomplete="name"></label>
+        <label>טלפון<input name="phone" required inputmode="tel" autocomplete="tel"></label>
+        <label>תאריך האירוע<input name="eventDate" type="date" required></label>
+        <label>שעה<input name="eventTime" type="time"></label>
+        <label class="wide">מיקום<input name="location"></label>
+        <label>שירות<select name="service" id="serviceSelect"></select></label>
+        <label>מחיר השירות<input name="servicePrice" type="number" min="0" step="1"></label>
+        <label>נסיעות<input name="travelPrice" type="number" min="0" step="1" value="0"></label>
+        <label>מקדמה<input name="depositAmount" type="number" min="0" step="1" value="0"></label>
+        <label>סטטוס מקדמה<select name="depositStatus"><option>לא שולמה</option><option>שולמה</option></select></label>
+        <label>אמצעי תשלום<select name="paymentMethod"><option value="">לא נבחר</option><option>העברה בנקאית</option><option>ביט</option><option>מזומן</option><option>אשראי</option><option>אחר</option></select></label>
+        <label>סטטוס הזמנה<select name="status"><option>טיוטה</option><option>ממתינה לאישור</option><option>מאושרת</option><option>הושלמה</option><option>בוטלה</option></select></label>
+        <label class="wide">הערות להסכם<textarea name="agreementNotes" rows="2"></textarea></label>
+        <label class="wide">הערות פנימיות <small>לא יופיעו בהסכם</small><textarea name="internalNotes" rows="2"></textarea></label>
+      </div>
+      <div class="totals" id="liveTotals"></div>
+      <div class="dialog-actions"><button type="button" class="secondary" data-close>ביטול</button><button type="submit" class="primary">שמירת הזמנה</button></div>
+    </form>
+  </dialog>
+
+  <dialog id="detailsDialog"><div id="detailsContent"></div></dialog>
+  <dialog id="priceDialog"><div id="priceContent"></div></dialog>
+  <dialog id="settingsDialog"><div id="settingsContent"></div></dialog>
+  <input id="restoreInput" type="file" accept="application/json" hidden>
+  <div id="toast" role="status" aria-live="polite"></div>
+  <script src="app.js"></script>
+</body>
+</html>
