@@ -1,0 +1,21 @@
+/* Agreement preview and exported PDF */
+.agreement{direction:rtl;background:#fff;border:1px solid var(--line);padding:30px;border-radius:14px;line-height:1.65;color:#231f20}
+.agreement-header{display:flex;align-items:center;justify-content:space-between;gap:24px;border-bottom:3px solid var(--brand);padding-bottom:16px;margin-bottom:22px}
+.agreement .agreement-logo{display:block;width:210px;max-height:84px;object-fit:contain;margin:0}
+.agreement h1{font-size:1.45rem;color:var(--brand);margin:0 0 5px}
+.agreement-header p{font-size:.78rem;color:var(--muted);margin:0}
+.agreement h2{text-align:right;color:var(--brand);font-size:1.05rem;margin:22px 0 9px}
+.agreement-table{border-collapse:collapse;width:100%;font-size:.88rem}
+.agreement-table th,.agreement-table td{border:1px solid #dccbd1;padding:9px;vertical-align:top}
+.agreement-table th{background:#f7eef1;color:#5d2337;width:18%}
+.agreement-note{background:#fbf7f8;border-right:4px solid var(--brand);padding:2px 14px 10px;margin-top:18px}
+.agreement-terms{break-inside:avoid-page}
+.agreement-terms ol{padding-right:22px;margin:0}
+.agreement-terms li{margin-bottom:7px;font-size:.86rem}
+.signature-row{display:grid;grid-template-columns:repeat(3,1fr);gap:22px;margin:40px 0 28px;break-inside:avoid}
+.signature-row div{display:grid;gap:18px;text-align:center;font-size:.8rem}
+.signature-row b{font-weight:400}
+.agreement-footer{text-align:center;border-top:1px solid var(--line);padding-top:10px;color:var(--muted);font-size:.72rem}
+.internal-note{background:#fff7dc;border:1px solid #ead8a0;border-radius:10px;padding:12px;margin:14px 0;color:#59460b}
+@media(max-width:760px){.agreement{padding:20px 14px}.agreement-header{display:grid;text-align:center}.agreement .agreement-logo{width:180px;margin:auto}.agreement h1{text-align:center}.agreement-table{font-size:.76rem}.agreement-table th,.agreement-table td{padding:6px}.agreement-table th{width:auto}.signature-row{grid-template-columns:1fr;margin-top:28px}.detail-actions>*{flex:1}}
+@media print{.internal-note,#toast{display:none!important}.agreement{padding:0!important}}

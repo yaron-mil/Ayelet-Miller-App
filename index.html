@@ -8,6 +8,7 @@
   <title>AYELET MILLER — ניהול לקוחות והזמנות</title>
   <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='15' fill='%2387163C'/%3E%3Cpath d='M17 47 32 14l15 33M23 35h18' fill='none' stroke='white' stroke-width='5'/%3E%3C/svg%3E" type="image/svg+xml">
   <link rel="stylesheet" href="styles.css">
+  <link rel="stylesheet" href="agreement.css?v=20261012-1">
 </head>
 <body>
   <header class="topbar">
@@ -49,6 +50,7 @@
       <div class="form-grid">
         <label>שם הלקוחה<input name="clientName" required autocomplete="name"></label>
         <label>טלפון<input name="phone" required inputmode="tel" autocomplete="tel"></label>
+        <label class="wide">דוא״ל <small>יופיע בהסכם אם הוזן</small><input name="email" type="email" inputmode="email" autocomplete="email"></label>
         <label>תאריך האירוע<input name="eventDate" type="date" required></label>
         <label>שעה<input name="eventTime" type="time"></label>
         <label class="wide">מיקום<input name="location"></label>
@@ -82,6 +84,7 @@
   <input id="restoreInput" type="file" accept="application/json" hidden>
   <div id="toast" role="status" aria-live="polite"></div>
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-  <script src="app.js?v=20261006-1"></script>
+  <script src="html2pdf.bundle.min.js"></script>
+  <script src="app.js?v=20261012-1"></script>
 </body>
 </html>
