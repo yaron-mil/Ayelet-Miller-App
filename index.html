@@ -54,12 +54,13 @@
         <label>תאריך האירוע<input name="eventDate" type="date" required></label>
         <label>שעה<input name="eventTime" type="time"></label>
         <label class="wide">מיקום<input name="location"></label>
-        <label>שירות<select name="service" id="serviceSelect"></select></label>
+        <label>שירות<select name="serviceSelection" id="serviceSelect"></select></label>
+        <label id="otherServiceField" hidden>פירוט השירות האחר<input name="serviceOther" id="serviceOtherInput" placeholder="לדוגמה: קורס עיצוב גבות"></label>
         <label>מחיר השירות<input name="servicePrice" type="number" min="0" step="1"></label>
         <label>נסיעות<input name="travelPrice" type="number" min="0" step="1" value="0"></label>
         <label>מקדמה<input name="depositAmount" type="number" min="0" step="1" value="0"></label>
         <label>סטטוס מקדמה<select name="depositStatus"><option>לא שולמה</option><option>שולמה</option></select></label>
-        <label>אמצעי תשלום<select name="paymentMethod"><option value="">לא נבחר</option><option>העברה בנקאית</option><option>ביט</option><option>מזומן</option><option>אשראי</option><option>אחר</option></select></label>
+        <label>אמצעי תשלום<select name="paymentMethod"><option value="">לא נבחר</option><option>העברה בנקאית</option><option>ביט</option><option>פייבוקס</option><option>מזומן</option><option>אשראי</option><option>אחר</option></select></label>
         <label>סטטוס הזמנה<select name="status"><option>טיוטה</option><option>ממתינה לאישור</option><option>מאושרת</option><option>הושלמה</option><option>בוטלה</option></select></label>
         <label class="wide">הערות להסכם<textarea name="agreementNotes" rows="2"></textarea></label>
         <label class="wide">הערות פנימיות <small>לא יופיעו בהסכם</small><textarea name="internalNotes" rows="2"></textarea></label>
@@ -85,6 +86,6 @@
   <div id="toast" role="status" aria-live="polite"></div>
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   <script src="html2pdf.bundle.min.js"></script>
-  <script src="app.js?v=20261012-1"></script>
+  <script src="app.js?v=20261014-1"></script>
 </body>
 </html>
