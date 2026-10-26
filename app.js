@@ -17,9 +17,9 @@ function render(){const now=new Date(),upcoming=data.bookings.filter(b=>b.status
 function renderList(){const q=$('#searchInput').value.trim().toLowerCase(),sf=$('#statusFilter').value;const items=data.bookings.filter(b=>(!q||b.clientName.toLowerCase().includes(q)||b.phone.replace(/\D/g,'').includes(q.replace(/\D/g,'')))&&(!sf||b.status===sf)).sort((a,b)=>`${a.eventDate}${a.eventTime}`.localeCompare(`${b.eventDate}${b.eventTime}`));$('#emptyState').hidden=items.length>0;$('#bookingList').innerHTML=items.map(b=>{const d=new Date(`${b.eventDate}T12:00:00`),c=calc(b);return `<article class="booking" data-id="${b.id}" tabindex="0"><div class="datebox"><strong>${d.getDate()}</strong><span>${d.toLocaleDateString('he-IL',{month:'short'})}</span></div><div class="meta"><strong>${esc(b.clientName)}</strong><small>${esc(b.phone)} · ${esc(b.location||'ללא מיקום')}</small></div><div class="service">${esc(b.service)}</div><div class="money">${money(c.balance)}<small> יתרה</small></div><span class="badge ${b.status==='הושלמה'?'done':''}">${esc(b.status)}</span></article>`}).join('')}
 function services(){const s=$('#serviceSelect');s.innerHTML=data.prices.map(p=>`<option value="${esc(p.name)}" data-price="${p.price}">${esc(p.name)}</option>`).join('')+`<option value="אחר">אחר</option>`}
 function toggleOtherService(){const f=$('#bookingForm'),isOther=f.elements.serviceSelection.value==='אחר',field=$('#otherServiceField'),input=$('#serviceOtherInput');field.hidden=!isOther;input.required=isOther;if(!isOther)input.value=''}
-function openBooking(b){services();const f=$('#bookingForm');f.reset();f.elements.id.value=b?.id||'';$('#dialogTitle').textContent=b?'עריכת הזמנה':'הזמנה חדשה';if(b){Object.entries(b).forEach(([k,v])=>{if(f.elements[k]&&!['serviceSelection','serviceOther'].includes(k))f.elements[k].value=v});const known=data.prices.some(p=>p.name===b.service)&&b.serviceIsOther!=='true';f.elements.serviceSelection.value=known?b.service:'אחר';f.elements.serviceOther.value=known?'':b.service}else{f.elements.eventDate.value=new Date().toISOString().slice(0,10);const p=data.prices[0];if(p){f.elements.serviceSelection.value=p.name;f.elements.servicePrice.value=p.price}}toggleOtherService();updateTotals();$('#bookingDialog').showModal()}
+function openBooking(b){services();const f=$('#bookingForm');f.reset();f.elements.id.value=b?.id||'';f.elements.makeupCount.value=b?.makeupCount||1;$('#dialogTitle').textContent=b?'עריכת הזמנה':'הזמנה חדשה';if(b){Object.entries(b).forEach(([k,v])=>{if(f.elements[k]&&!['serviceSelection','serviceOther'].includes(k))f.elements[k].value=v});const known=data.prices.some(p=>p.name===b.service)&&b.serviceIsOther!=='true';f.elements.serviceSelection.value=known?b.service:'אחר';f.elements.serviceOther.value=known?'':b.service}else{f.elements.eventDate.value=new Date().toISOString().slice(0,10);const p=data.prices[0];if(p){f.elements.serviceSelection.value=p.name;f.elements.servicePrice.value=p.price}}toggleOtherService();updateTotals();$('#bookingDialog').showModal()}
 function updateTotals(){const f=$('#bookingForm'),c=calc({servicePrice:f.elements.servicePrice.value,travelPrice:f.elements.travelPrice.value,depositAmount:f.elements.depositAmount.value,depositStatus:f.elements.depositStatus.value});$('#liveTotals').innerHTML=`<span>סה״כ<strong>${money(c.total)}</strong></span><span>שולם<strong>${money(c.paid)}</strong></span><span>יתרה לתשלום<strong>${money(c.balance)}</strong></span>`}
-function submitBooking(){const f=$('#bookingForm'),obj=Object.fromEntries(new FormData(f)),isOther=obj.serviceSelection==='אחר';obj.service=isOther?obj.serviceOther.trim():obj.serviceSelection;obj.serviceIsOther=String(isOther);delete obj.serviceSelection;delete obj.serviceOther;if(!obj.service){toast('יש לציין את סוג השירות');return}obj.id=obj.id||crypto.randomUUID();obj.updatedAt=new Date().toISOString();const i=data.bookings.findIndex(x=>x.id===obj.id);if(i>=0)data.bookings[i]={...data.bookings[i],...obj};else{obj.createdAt=obj.updatedAt;data.bookings.push(obj)}save(`${i>=0?'עודכנה':'נוצרה'} הזמנה עבור ${obj.clientName}`);toast('ההזמנה נשמרה')}
+function submitBooking(){const f=$('#bookingForm'),obj=Object.fromEntries(new FormData(f)),isOther=obj.serviceSelection==='אחר';obj.service=isOther?obj.serviceOther.trim():obj.serviceSelection;obj.serviceIsOther=String(isOther);delete obj.serviceSelection;delete obj.serviceOther;if(!obj.service){toast('יש לציין את סוג השירות');return}if(!Number.isInteger(Number(obj.makeupCount))||Number(obj.makeupCount)<1){toast('יש להזין כמות מאופרות תקינה');return}obj.id=obj.id||crypto.randomUUID();obj.updatedAt=new Date().toISOString();const i=data.bookings.findIndex(x=>x.id===obj.id);if(i>=0)data.bookings[i]={...data.bookings[i],...obj};else{obj.createdAt=obj.updatedAt;data.bookings.push(obj)}save(`${i>=0?'עודכנה':'נוצרה'} הזמנה עבור ${obj.clientName}`);toast('ההזמנה נשמרה')}
 const dateHe=value=>value?new Date(`${value}T12:00:00`).toLocaleDateString('he-IL'):'לא נקבע';
 const safeFileName=value=>String(value||'לקוחה').trim().replace(/[\\/:*?"<>|]+/g,'-').replace(/\s+/g,'-');
 function agreementHtml(b){const c=calc(b),created=dateHe((b.createdAt||'').slice(0,10));return `<section class="agreement" id="agreement-${b.id}" dir="rtl">
@@ -29,24 +29,37 @@ function agreementHtml(b){const c=calc(b),created=dateHe((b.createdAt||'').slice
     <tr><th>שם הלקוחה</th><td>${esc(b.clientName)}</td><th>טלפון</th><td>${esc(b.phone)}</td></tr>
     ${b.email?`<tr><th>דוא״ל</th><td colspan="3">${esc(b.email)}</td></tr>`:''}
     <tr><th>תאריך הזמנה</th><td>${created}</td><th>תאריך האירוע</th><td>${dateHe(b.eventDate)}</td></tr>
-    <tr><th>שעת האירוע</th><td>${esc(b.eventTime||'לא נקבעה')}</td><th>מקום ההתארגנות</th><td>${esc(b.location||'לא נקבע')}</td></tr>
+    <tr><th>שעת האירוע</th><td>${esc(b.eventTimeText||b.eventTime||'לא נקבעה')}</td><th>מקום ההתארגנות</th><td>${esc(b.location||'לא נקבע')}</td></tr>
     <tr><th>השירות</th><td colspan="3">${esc(b.service)}</td></tr>
+    <tr><th>כמות מאופרות</th><td>${esc(b.makeupCount||1)}</td><th>פירוט השירות</th><td>${esc(b.serviceDetails||'—').replace(/\n/g,'<br>')}</td></tr>
   </tbody></table>
   <h2>תמורה ותשלום</h2>
   <table class="agreement-table money-table"><tbody>
-    <tr><th>מחיר השירות</th><td>${money(b.servicePrice)}</td><th>נסיעות</th><td>${money(b.travelPrice)}</td></tr>
+    <tr><th>מחיר השירות</th><td>${money(b.servicePrice)}</td><th>נסיעות</th><td>${money(b.travelPrice)}${b.travelLocation?` — ${esc(b.travelLocation)}`:''}</td></tr>
     <tr><th>סה״כ</th><td><strong>${money(c.total)}</strong></td><th>אמצעי תשלום</th><td>${esc(b.paymentMethod||'טרם נקבע')}</td></tr>
     <tr><th>מקדמה ששולמה</th><td>${money(c.paid)}</td><th>יתרה לתשלום</th><td><strong>${money(c.balance)}</strong></td></tr>
+    ${b.depositDetails?`<tr><th>פירוט מקדמה</th><td colspan="3">${esc(b.depositDetails).replace(/\n/g,'<br>')}</td></tr>`:''}
   </tbody></table>
   ${b.agreementNotes?`<div class="agreement-note"><h2>פרטים נוספים</h2><p>${esc(b.agreementNotes).replace(/\n/g,'<br>')}</p></div>`:''}
-  <div class="agreement-terms"><h2>תנאי ההתקשרות והביטול</h2><ol>
-    <li>הלקוחה מאשרת כי פרטי האירוע והשירות המפורטים בהסכם נכונים וכי קראה את תנאי ההתקשרות.</li>
-    <li>בקשת ביטול תימסר לאיילת בכתב. ביטול בתוך 14 ימים ממועד ההתקשרות יטופל בהתאם להוראות הדין.</li>
-    <li>בביטול לאחר התקופה האמורה ועד 60 ימים לפני האירוע יחולו דמי ביטול בשיעור 50% מסכום ההזמנה.</li>
-    <li>בביטול פחות מ-60 ימים לפני האירוע יחולו דמי ביטול בשיעור 80% מסכום ההזמנה.</li>
-    <li>במקרה של כוח עליון או נסיבות שאינן בשליטת הצדדים, הצדדים יפעלו בתום לב לתיאום מועד חלופי או להסדרת הביטול.</li>
-    <li>סמכות השיפוט המקומית בכל מחלוקת הנוגעת להסכם זה תהיה בבתי המשפט המוסמכים בחיפה.</li>
-  </ol></div>
+  <div class="agreement-terms"><h2>תנאי ההתקשרות והביטול</h2>
+    <p><strong>יש לציין כי במידה ומאופרת מבטלת איפור, המקדמה לא תקוזז ממחיר איפור ערב/ כלה בתאריך הרשום לעיל ו/או בתאריך אחר</strong></p>
+    <h3>יש לקרוא ולאשר בהודעה חוזרת</h3>
+    <p>הלקוחה רשאית לבטל הסכם זה בתוך 14 ימים מיום ההתקשרות בהסכם זה, הכל בהתאם לחוק הגנת הצרכן (ביטול עסקה), תשע"א,2010- בין אם הוחל במתן השירות ובין אם לא, בכפוף לתשלום דמי ביטול של 5% ממחיר החבילה או 100 ₪, לפי הנמוך מביניהם, (דמי הביטול ייגבו משווי החבילה במלואה ולא משווי המקדמה).</p>
+    <h3>עמלת החזר תשלום:</h3>
+    <p>בגין הוצאת שיקים שהופקדו לבנק – על הלקוחה לשלם את עלות משיכתם לפי התעריף שנקבע על ידי הבנק מעת לעת.</p>
+    <p>בגין ביטול תשלום שבוצע באמצעות כרטיס אשראי – תחויב הלקוחה בעמלת סליקת כרטיס אשראי כפי שחויבה המאפרת על ידי חברת האשראי.</p>
+    <h3>ביטול לאחר 14 ימים מיום ההתקשרות</h3>
+    <p>הודעת הביטול תיעשה בדרך של הודעה בכתב ו/או בדואר אלקטרוני, כמפורט במבוא להסכם זה ותכלול שם מלא, מספר ת.ז., מספר טלפון, יום ההתקשרות בהסכם ויום האירוע.</p>
+    <p>במקרה של "כוח עליון" (קורונה/מלחמה וכו') כאשר מועד יום האירוע יידחה, הצדדים ייקבעו מועד חדש והמקדמה תועבר לתאריך החדש שייקבע.</p>
+    <p>במקרה של "כוח עליון" (קורונה/מלחמה וכו') שאינו מאפשר למאפרת לבצע את עבודות האיפור כמתואר לעיל, המאפרת תנסה למצוא לה מחליפ/ה ו/או להחזיר את המקדמה.</p>
+    <p>במקרה של ביטול חוזה עקב סיבות אישיות (ביטול אירוע חלילה) המקדמה אינה חוזרת.</p>
+    <p>ביטול לאחר 14 ימים מיום ההתקשרות ועד 60 ימים מיום האירוע תחויב הלקוחה בתשלום 50% משווי החבילה.</p>
+    <p>ביטול בטווח הקטן מ-60 ימים מיום האירוע תחויב הלקוחה בתשלום של 80% משווי החבילה.</p>
+    <h3>סמכות שיפוט</h3>
+    <p>מוסכם על הצדדים כי בכל סכסוך הנוגע להסכם זה ו/או לכל הקשור אליו, במישרין ו/או בעקיפין, תהיה סמכות השיפוט הבלעדית נתונה לבית המשפט המוסמך בחיפה בלבד מקרה של הפרת הסכם זה, ויחולו על הצדדים הוראות הדין הישראלי.</p>
+    <p>מוסכם בין הצדדים במקרה של הפרת הסכם זה (מי מהצדדים) כולו או חלקו מכל סיבה שהיא, הפיצוי המקסימאלי לא יעלה על שווי התמורה.</p>
+    <p>באיחולי מזל טוב ובשעה טובה</p>
+  </div>
   <div class="signature-row"><div><span>חתימת נותנת השירות</span><b>________________</b></div><div><span>חתימת הלקוחה</span><b>________________</b></div><div><span>תאריך</span><b>________________</b></div></div>
   <footer class="agreement-footer">AYELET MILLER · הסכם שירות שנוצר במערכת ניהול ההזמנות</footer>
 </section>`}
