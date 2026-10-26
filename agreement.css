@@ -19,3 +19,20 @@
 .internal-note{background:#fff7dc;border:1px solid #ead8a0;border-radius:10px;padding:12px;margin:14px 0;color:#59460b}
 @media(max-width:760px){.agreement{padding:20px 14px}.agreement-header{display:grid;text-align:center}.agreement .agreement-logo{width:180px;margin:auto}.agreement h1{text-align:center}.agreement-table{font-size:.76rem}.agreement-table th,.agreement-table td{padding:6px}.agreement-table th{width:auto}.signature-row{grid-template-columns:1fr;margin-top:28px}.detail-actions>*{flex:1}}
 @media print{.internal-note,#toast{display:none!important}.agreement{padding:0!important}}
+
+/* Refined non-table agreement layout, brand styling */
+.agreement h1,.agreement h2,.agreement h3,.agreement strong,.agreement b,.agreement th{color:#87163C}
+.agreement h3{font-size:.96rem;margin:19px 0 6px}
+.agreement-block{margin:22px 0;break-inside:avoid-page}
+.agreement-block h2{border-bottom:1px solid #eadde2;padding-bottom:7px}
+.agreement-fields{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px 25px;font-size:.9rem}
+.agreement-fields>div{display:flex;flex-direction:column;gap:3px;min-width:0;overflow-wrap:anywhere}
+.agreement-fields strong{font-weight:700}
+.agreement-field-wide{grid-column:1/-1}
+.agreement-payment-total{background:#fbf7f8;border-right:3px solid #87163C;padding:14px 16px;border-radius:8px;margin-top:18px;display:flex;justify-content:space-between;gap:18px}
+.agreement-payment-total>div{display:grid;gap:4px}
+.agreement-payment-total span{font-weight:700;color:#87163C;font-size:1.1rem}
+.agreement-terms{break-inside:auto}
+.agreement-terms>p,.agreement-terms>h3{break-inside:avoid}
+.agreement-terms>p:first-of-type{color:#87163C;font-weight:700;border-right:3px solid #87163C;padding:9px 13px;background:#fbf7f8}
+@media(max-width:560px){.agreement-fields{grid-template-columns:1fr}.agreement-payment-total{flex-direction:column}}
