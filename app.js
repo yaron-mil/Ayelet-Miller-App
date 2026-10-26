@@ -24,22 +24,35 @@ const dateHe=value=>value?new Date(`${value}T12:00:00`).toLocaleDateString('he-I
 const safeFileName=value=>String(value||'לקוחה').trim().replace(/[\\/:*?"<>|]+/g,'-').replace(/\s+/g,'-');
 function agreementHtml(b){const c=calc(b),created=dateHe((b.createdAt||'').slice(0,10));return `<section class="agreement" id="agreement-${b.id}" dir="rtl">
   <header class="agreement-header"><img class="agreement-logo" src="ayelet-logo.png" alt="AYELET MILLER"><div><h1>הסכם למתן שירותי איפור</h1><p>מספר הסכם: ${esc(String(b.id).slice(0,8).toUpperCase())} · תאריך הפקה: ${new Date().toLocaleDateString('he-IL')}</p></div></header>
-  <h2>פרטי הלקוחה והאירוע</h2>
-  <table class="agreement-table"><tbody>
-    <tr><th>שם הלקוחה</th><td>${esc(b.clientName)}</td><th>טלפון</th><td>${esc(b.phone)}</td></tr>
-    ${b.email?`<tr><th>דוא״ל</th><td colspan="3">${esc(b.email)}</td></tr>`:''}
-    <tr><th>תאריך הזמנה</th><td>${created}</td><th>תאריך האירוע</th><td>${dateHe(b.eventDate)}</td></tr>
-    <tr><th>שעת האירוע</th><td>${esc(b.eventTimeText||b.eventTime||'לא נקבעה')}</td><th>מקום ההתארגנות</th><td>${esc(b.location||'לא נקבע')}</td></tr>
-    <tr><th>השירות</th><td colspan="3">${esc(b.service)}</td></tr>
-    <tr><th>כמות מאופרות</th><td>${esc(b.makeupCount||1)}</td><th>פירוט השירות</th><td>${esc(b.serviceDetails||'—').replace(/\n/g,'<br>')}</td></tr>
-  </tbody></table>
-  <h2>תמורה ותשלום</h2>
-  <table class="agreement-table money-table"><tbody>
-    <tr><th>מחיר השירות</th><td>${money(b.servicePrice)}</td><th>נסיעות</th><td>${money(b.travelPrice)}${b.travelLocation?` — ${esc(b.travelLocation)}`:''}</td></tr>
-    <tr><th>סה״כ</th><td><strong>${money(c.total)}</strong></td><th>אמצעי תשלום</th><td>${esc(b.paymentMethod||'טרם נקבע')}</td></tr>
-    <tr><th>מקדמה ששולמה</th><td>${money(c.paid)}</td><th>יתרה לתשלום</th><td><strong>${money(c.balance)}</strong></td></tr>
-    ${b.depositDetails?`<tr><th>פירוט מקדמה</th><td colspan="3">${esc(b.depositDetails).replace(/\n/g,'<br>')}</td></tr>`:''}
-  </tbody></table>
+  <div class="agreement-block"><h2>פרטי הלקוחה והאירוע</h2>
+    <div class="agreement-fields">
+      <div><strong>שם הלקוחה</strong><span>${esc(b.clientName)}</span></div>
+      <div><strong>טלפון</strong><span>${esc(b.phone)}</span></div>
+      ${b.email?`<div><strong>דוא״ל</strong><span>${esc(b.email)}</span></div>`:""}
+      <div><strong>תאריך הזמנה</strong><span>${created}</span></div>
+      <div><strong>תאריך האירוע</strong><span>${dateHe(b.eventDate)}</span></div>
+      <div><strong>שעת האירוע</strong><span>${esc(b.eventTimeText||b.eventTime||"לא נקבעה")}</span></div>
+      <div><strong>מקום ההתארגנות</strong><span>${esc(b.location||"לא נקבע")}</span></div>
+    </div>
+  </div>
+  <div class="agreement-block"><h2>פרטי השירות</h2>
+    <div class="agreement-fields">
+      <div><strong>סוג השירות</strong><span>${esc(b.service)}</span></div>
+      <div><strong>כמות מאופרות</strong><span>${esc(b.makeupCount||1)}</span></div>
+      ${b.serviceDetails?`<div class="agreement-field-wide"><strong>פירוט השירות</strong><span>${esc(b.serviceDetails).replace(/\n/g,"<br>")}</span></div>`:""}
+    </div>
+  </div>
+  <div class="agreement-block"><h2>פירוט תשלום</h2>
+    <div class="agreement-fields">
+      <div><strong>מחיר השירות</strong><span>${money(b.servicePrice)}</span></div>
+      <div><strong>נסיעות</strong><span>${money(b.travelPrice)}</span></div>
+      ${b.travelLocation?`<div class="agreement-field-wide"><strong>מיקום הנסיעה</strong><span>${esc(b.travelLocation)}</span></div>`:""}
+      <div><strong>אמצעי תשלום</strong><span>${esc(b.paymentMethod||"טרם נקבע")}</span></div>
+      <div><strong>מקדמה ששולמה</strong><span>${money(c.paid)}</span></div>
+      ${b.depositDetails?`<div class="agreement-field-wide"><strong>פירוט מקדמה</strong><span>${esc(b.depositDetails).replace(/\n/g,"<br>")}</span></div>`:""}
+    </div>
+    <div class="agreement-payment-total"><div><strong>סה״כ לתשלום</strong><span>${money(c.total)}</span></div><div><strong>יתרה לתשלום</strong><span>${money(c.balance)}</span></div></div>
+  </div>
   ${b.agreementNotes?`<div class="agreement-note"><h2>פרטים נוספים</h2><p>${esc(b.agreementNotes).replace(/\n/g,'<br>')}</p></div>`:''}
   <div class="agreement-terms"><h2>תנאי ההתקשרות והביטול</h2>
     <p><strong>יש לציין כי במידה ומאופרת מבטלת איפור, המקדמה לא תקוזז ממחיר איפור ערב/ כלה בתאריך הרשום לעיל ו/או בתאריך אחר</strong></p>
