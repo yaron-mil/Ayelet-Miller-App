@@ -129,9 +129,27 @@ async function shareAgreement(id){
  saveAgreementBlob(result.blob,result.filename);
  toast('ה-PDF הורד. ניתן לשתף אותו דרך קבצים או WhatsApp');
 }
+async function shareAgreementWhatsApp(id){
+ const b=data.bookings.find(x=>x.id===id);
+ if(!b){toast('ההזמנה לא נמצאה');return}
+ const message='שלום '+b.clientName+', מצורף הסכם שירותי האיפור של איילת מילר. אשמח שתעייני בהסכם ותחזירי אותו חתום. תודה רבה!';
+ toast('מכינה PDF והודעה ל-WhatsApp...');
+ const result=await createAgreementPdf(id);
+ if(!result)return;
+ const file=new File([result.blob],result.filename,{type:'application/pdf'});
+ if(navigator.share&&navigator.canShare&&navigator.canShare({files:[file]})){
+   try{await navigator.share({files:[file],text:message,title:'הסכם איפור – איילת מילר'});return}
+   catch(error){if(error.name==='AbortError')return;console.error('WhatsApp share failed',error)}
+ }
+ saveAgreementBlob(result.blob,result.filename);
+ const phone=String(b.phone||'').replace(/\D/g,'').replace(/^0/,'972');
+ if(phone)window.open('https://wa.me/'+phone+'?text='+encodeURIComponent(message),'_blank','noopener');
+ toast('ה-PDF הורד. יש לצרף אותו ידנית לשיחת WhatsApp');
+}
+window.shareAgreementWhatsApp=shareAgreementWhatsApp;
 window.downloadAgreement=downloadAgreement;
 window.shareAgreement=shareAgreement;
-function detail(id){const b=data.bookings.find(x=>x.id===id);if(!b)return;const phone=b.phone.replace(/\D/g,'').replace(/^0/,'972'),hist=data.history.filter(h=>h.action.includes(b.clientName)).slice(0,8);$('#detailsContent').innerHTML=`<div class="dialog-head"><div><p class="eyebrow">${esc(b.status)}</p><h2>${esc(b.clientName)} · ${dateHe(b.eventDate)}</h2></div><button class="close" onclick="detailsDialog.close()">×</button></div><div class="detail-actions"><button class="primary" onclick="downloadAgreement('${b.id}')">הסכם להורדה כ-PDF</button><button class="secondary" onclick="shareAgreement('${b.id}')">שיתוף ההסכם</button><button class="secondary" onclick="downloadAgreement('${b.id}')">הדפסה</button><button class="secondary" onclick="editBooking('${b.id}')">עריכה</button><button class="secondary" onclick="duplicateBooking('${b.id}')">שכפול</button><button class="secondary" onclick="shareAgreement('${b.id}')">הסכם לשיתוף ב-WhatsApp</button></div>${agreementHtml(b)}${b.internalNotes?`<aside class="internal-note"><strong>הערה פנימית - אינה מופיעה בקובץ:</strong><br>${esc(b.internalNotes).replace(/\n/g,'<br>')}</aside>`:''}<h3>היסטוריית שינויים</h3><div class="timeline">${hist.map(h=>`<div><strong>${esc(h.action)}</strong><small> · ${new Date(h.at).toLocaleString('he-IL')}</small></div>`).join('')||'אין שינויים קודמים'}</div>`;$('#detailsDialog').showModal()}
+function detail(id){const b=data.bookings.find(x=>x.id===id);if(!b)return;const phone=b.phone.replace(/\D/g,'').replace(/^0/,'972'),hist=data.history.filter(h=>h.action.includes(b.clientName)).slice(0,8);$('#detailsContent').innerHTML=`<div class="dialog-head"><div><p class="eyebrow">${esc(b.status)}</p><h2>${esc(b.clientName)} · ${dateHe(b.eventDate)}</h2></div><button class="close" onclick="detailsDialog.close()">×</button></div><div class="detail-actions"><button class="primary" onclick="downloadAgreement('${b.id}')">הסכם להורדה כ-PDF</button><button class="secondary" onclick="shareAgreement('${b.id}')">שיתוף ההסכם</button><button class="secondary" onclick="downloadAgreement('${b.id}')">הדפסה</button><button class="secondary" onclick="editBooking('${b.id}')">עריכה</button><button class="secondary" onclick="duplicateBooking('${b.id}')">שכפול</button><button class="secondary" onclick="shareAgreementWhatsApp('${b.id}')">הסכם לשיתוף ב-WhatsApp</button></div>${agreementHtml(b)}${b.internalNotes?`<aside class="internal-note"><strong>הערה פנימית - אינה מופיעה בקובץ:</strong><br>${esc(b.internalNotes).replace(/\n/g,'<br>')}</aside>`:''}<h3>היסטוריית שינויים</h3><div class="timeline">${hist.map(h=>`<div><strong>${esc(h.action)}</strong><small> · ${new Date(h.at).toLocaleString('he-IL')}</small></div>`).join('')||'אין שינויים קודמים'}</div>`;$('#detailsDialog').showModal()}
 window.editBooking=id=>{$('#detailsDialog').close();openBooking(data.bookings.find(b=>b.id===id))};
 window.duplicateBooking=id=>{const source=data.bookings.find(x=>x.id===id),b={...source,id:'',status:'טיוטה',clientName:source.clientName+' — עותק'};$('#detailsDialog').close();openBooking(b)};
 function priceList(){$('#priceContent').innerHTML=`<div class="dialog-head"><div><p class="eyebrow">הגדרות</p><h2>מחירון</h2></div><button class="close" onclick="priceDialog.close()">×</button></div><div id="prices">${data.prices.map(p=>`<div class="price-row"><input value="${esc(p.name)}" data-id="${p.id}" data-k="name"><input type="number" value="${p.price}" data-id="${p.id}" data-k="price"><button class="secondary" data-del="${p.id}">מחיקה</button></div>`).join('')}</div><div class="dialog-actions"><button class="secondary" id="addPrice">הוספת שירות</button><button class="primary" id="savePrices">שמירה</button></div>`;$('#priceDialog').showModal();$('#addPrice').onclick=()=>{data.prices.push({id:crypto.randomUUID(),name:'שירות חדש',price:0});priceList()};$('#prices').onclick=e=>{if(e.target.dataset.del){data.prices=data.prices.filter(p=>p.id!==e.target.dataset.del);priceList()}};$('#savePrices').onclick=()=>{$('#prices').querySelectorAll('input').forEach(i=>{const p=data.prices.find(x=>x.id===i.dataset.id);p[i.dataset.k]=i.dataset.k==='price'?Number(i.value):i.value});save('המחירון עודכן');$('#priceDialog').close();toast('המחירון נשמר')}}
