@@ -78,31 +78,59 @@ function agreementHtml(b){const c=calc(b),created=dateHe((b.createdAt||'').slice
 </section>`}
 function agreementOptions(b){return {margin:[10,10,10,10],filename:`הסכם-${safeFileName(b.clientName)}-${b.eventDate||new Date().toISOString().slice(0,10)}.pdf`,image:{type:'jpeg',quality:.98},html2canvas:{scale:2,useCORS:true,backgroundColor:'#ffffff',scrollY:0},jsPDF:{unit:'mm',format:'a4',orientation:'portrait'},pagebreak:{mode:['css','legacy'],avoid:['tr','.signature-row']}}}
 
-function openAgreementDocument(id){
+// Generate a real PDF file rather than asking iOS Safari to print a dynamically opened HTML page.
+async function createAgreementPdf(id){
  const b=data.bookings.find(x=>x.id===id);
- if(!b){toast('ההזמנה לא נמצאה');return}
- const w=window.open('','_blank');
- if(!w){toast('נא לאפשר חלונות קופצים ב-Safari ולנסות שוב');return}
- const header='<!doctype html><html lang="he" dir="rtl"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>הסכם איפור</title>'
-  +'<link rel="stylesheet" href="'+new URL('styles.css',location.href).href+'">'
-  +'<link rel="stylesheet" href="'+new URL('agreement.css',location.href).href+'">'
-  +'<style>body{background:#f8f4f5;margin:0;padding:18px;font-family:Arial,sans-serif}'
-  +'.agreement-document-controls{max-width:850px;margin:0 auto 14px;padding:14px;background:#fff;border-radius:12px;display:flex;align-items:center;flex-wrap:wrap;gap:12px}'
-  +'.agreement-document-controls button{font:inherit;border:0;padding:11px 16px;border-radius:9px;background:#87163C;color:white;cursor:pointer}'
-  +'.agreement-document-controls p{margin:0;flex:1;min-width:200px;font-size:14px}.agreement{max-width:850px;margin:auto}'
-  +'@media print{@page{size:A4;margin:12mm}body{padding:0;background:#fff}.agreement-document-controls{display:none!important}.agreement{max-width:none;border:0;box-shadow:none;padding:0!important}.agreement-header,.agreement-block,.agreement-payment-total,.signature-row{break-inside:avoid}.agreement h2{break-after:avoid}}'
-  +'</style></head><body>'
-  +'<div class="agreement-document-controls"><button onclick="window.print()">הדפסה / שמירה כ-PDF</button><p>באייפון: לחצו על הכפתור, פתחו את תצוגת ההדפסה ובחרו שיתוף כדי לשמור PDF או לשלוח ב-WhatsApp.</p></div>';
+ if(!b){toast('ההזמנה לא נמצאה');return null}
+ if(typeof html2pdf!=='function'){toast('רכיב יצירת PDF לא נטען. נסו לרענן את הדף');return null}
+ const holder=document.createElement('div');
+ holder.setAttribute('dir','rtl');
+ holder.style.cssText='position:fixed;left:-10000px;top:0;width:794px;max-width:none;background:#fff;z-index:-1;pointer-events:none;';
+ holder.innerHTML=agreementHtml(b);
+ document.body.appendChild(holder);
  try{
-   w.document.open();
-   w.document.write(header+agreementHtml(b)+'</body></html>');
-   w.document.close();
-   w.focus();
-   toast('ההסכם נפתח בחלון חדש');
- }catch(error){console.error('Agreement document open failed',error);toast('פתיחת ההסכם נכשלה — נסו דרך Safari')}
+   if(document.fonts&&document.fonts.ready)await document.fonts.ready;
+   const images=Array.from(holder.querySelectorAll('img'));
+   await Promise.all(images.map(img=>img.complete?Promise.resolve():new Promise(resolve=>{img.addEventListener('load',resolve,{once:true});img.addEventListener('error',resolve,{once:true})})));
+   const options=agreementOptions(b);
+   options.pagebreak={mode:['css','legacy'],avoid:['.signature-row','.agreement-header','.agreement-payment-total']};
+   const blob=await html2pdf().set(options).from(holder.querySelector('.agreement')||holder).toPdf().outputPdf('blob');
+   if(!blob||blob.size<1000)throw new Error('PDF was empty');
+   return {blob,filename:options.filename};
+ }catch(error){
+   console.error('Agreement PDF generation failed',error);
+   toast('יצירת PDF נכשלה. נסו שוב ב-Safari או במחשב');
+   return null;
+ }finally{holder.remove()}
 }
-window.downloadAgreement=openAgreementDocument;
-window.shareAgreement=openAgreementDocument;
+function saveAgreementBlob(blob,filename){
+ const url=URL.createObjectURL(blob);
+ const link=document.createElement('a');
+ link.href=url;link.download=filename;
+ document.body.appendChild(link);link.click();link.remove();
+ setTimeout(()=>URL.revokeObjectURL(url),60000);
+}
+async function downloadAgreement(id){
+ toast('מכינה קובץ PDF...');
+ const result=await createAgreementPdf(id);
+ if(!result)return;
+ saveAgreementBlob(result.blob,result.filename);
+ toast('קובץ ההסכם הוכן להורדה');
+}
+async function shareAgreement(id){
+ toast('מכינה קובץ PDF לשיתוף...');
+ const result=await createAgreementPdf(id);
+ if(!result)return;
+ const file=new File([result.blob],result.filename,{type:'application/pdf'});
+ if(navigator.share&&navigator.canShare&&navigator.canShare({files:[file]})){
+   try{await navigator.share({files:[file],title:'הסכם איפור'});return}
+   catch(error){if(error.name==='AbortError')return;console.error('PDF share failed',error)}
+ }
+ saveAgreementBlob(result.blob,result.filename);
+ toast('ה-PDF הורד. ניתן לשתף אותו דרך קבצים או WhatsApp');
+}
+window.downloadAgreement=downloadAgreement;
+window.shareAgreement=shareAgreement;
 function detail(id){const b=data.bookings.find(x=>x.id===id);if(!b)return;const phone=b.phone.replace(/\D/g,'').replace(/^0/,'972'),hist=data.history.filter(h=>h.action.includes(b.clientName)).slice(0,8);$('#detailsContent').innerHTML=`<div class="dialog-head"><div><p class="eyebrow">${esc(b.status)}</p><h2>${esc(b.clientName)} · ${dateHe(b.eventDate)}</h2></div><button class="close" onclick="detailsDialog.close()">×</button></div><div class="detail-actions"><button class="primary" onclick="downloadAgreement('${b.id}')">הסכם להורדה כ-PDF</button><button class="secondary" onclick="shareAgreement('${b.id}')">שיתוף ההסכם</button><button class="secondary" onclick="downloadAgreement('${b.id}')">הדפסה</button><button class="secondary" onclick="editBooking('${b.id}')">עריכה</button><button class="secondary" onclick="duplicateBooking('${b.id}')">שכפול</button><button class="secondary" onclick="shareAgreement('${b.id}')">הסכם לשיתוף ב-WhatsApp</button></div>${agreementHtml(b)}${b.internalNotes?`<aside class="internal-note"><strong>הערה פנימית - אינה מופיעה בקובץ:</strong><br>${esc(b.internalNotes).replace(/\n/g,'<br>')}</aside>`:''}<h3>היסטוריית שינויים</h3><div class="timeline">${hist.map(h=>`<div><strong>${esc(h.action)}</strong><small> · ${new Date(h.at).toLocaleString('he-IL')}</small></div>`).join('')||'אין שינויים קודמים'}</div>`;$('#detailsDialog').showModal()}
 window.editBooking=id=>{$('#detailsDialog').close();openBooking(data.bookings.find(b=>b.id===id))};
 window.duplicateBooking=id=>{const source=data.bookings.find(x=>x.id===id),b={...source,id:'',status:'טיוטה',clientName:source.clientName+' — עותק'};$('#detailsDialog').close();openBooking(b)};
