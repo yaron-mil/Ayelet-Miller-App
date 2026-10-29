@@ -81,16 +81,16 @@
   <dialog id="loginDialog">
     <form id="loginForm">
       <div class="dialog-head"><div><p class="eyebrow">כניסה מאובטחת</p><h2>המידע שלך, בכל מכשיר</h2></div></div>
-      <p>הזיני את כתובת המייל של איילת. יישלח אליה קישור חד־פעמי לכניסה — ללא סיסמה.</p>
-      <label>כתובת מייל<input name="email" type="email" required autocomplete="email" placeholder="name@example.com"></label>
+      <p>אפשר להיכנס עם Face ID / Touch ID אחרי רישום המכשיר, או באמצעות קישור חד־פעמי למייל.</p>
+      <button type="button" id="passkeyLoginBtn" class="primary" style="width:100%;margin-bottom:14px" onclick="signInWithDevice()">כניסה עם Face ID / Touch ID</button><label>כתובת מייל<input name="email" type="email" required autocomplete="email" placeholder="name@example.com"></label>
       <div class="dialog-actions"><button type="submit" class="primary">שליחת קישור כניסה</button></div>
       <small>הנתונים נשמרים בענן רק לאחר כניסה.</small>
     </form>
   </dialog>
   <input id="restoreInput" type="file" accept="application/json" hidden>
   <div id="toast" role="status" aria-live="polite"></div>
-  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.105.0"></script>
   <script src="html2pdf.bundle.min.js"></script>
-  <script src="app.js?v=20261027-4"></script>
+  <script src="app.js?v=20261029-1"></script>
 </body>
 </html>
