@@ -302,5 +302,36 @@ function settings(){$('#settingsContent').innerHTML=`<div class="dialog-head"><d
 $('#todayLabel').textContent=new Date().toLocaleDateString('he-IL',{weekday:'long',day:'numeric',month:'long'});
 $('#newBookingBtn').onclick=()=>openBooking();$('#bookingForm').addEventListener('submit',submitBooking);$('#bookingForm').addEventListener('input',updateTotals);$('#serviceSelect').onchange=e=>{toggleOtherService();const o=e.target.selectedOptions[0];if(o.dataset.price)$('#bookingForm').elements.servicePrice.value=o.dataset.price;updateTotals()};document.querySelectorAll('[data-close]').forEach(b=>b.onclick=()=>b.closest('dialog').close());$('#searchInput').oninput=renderList;$('#statusFilter').onchange=renderList;$('#bookingList').onclick=e=>{const el=e.target.closest('.booking');if(el)detail(el.dataset.id)};$('#bookingList').onkeydown=e=>{if(e.key==='Enter')detail(e.target.closest('.booking')?.dataset.id)};$('#priceListBtn').onclick=priceList;$('#backupBtn').onclick=backup;$('#settingsBtn').onclick=settings;$('#restoreInput').onchange=async e=>{try{const restored=JSON.parse(await e.target.files[0].text());if(!Array.isArray(restored.bookings)||!Array.isArray(restored.prices))throw 0;data={...seed,...restored};save('שוחזר גיבוי');toast('הגיבוי שוחזר בהצלחה')}catch{toast('קובץ הגיבוי אינו תקין')}};
 services();render();
-$('#loginForm').addEventListener('submit',async e=>{e.preventDefault();const email=new FormData(e.currentTarget).get('email');const {error}=await cloud.auth.signInWithOtp({email,options:{emailRedirectTo:location.origin+location.pathname}});if(error)toast('שליחת הקישור נכשלה');else{$('#loginDialog').close();toast('קישור כניסה נשלח למייל')}});
+function emailLoginFeedback(message,success=false){
+  const panel=$('#loginEmailFeedback');
+  if(panel){panel.textContent=message;panel.hidden=false;panel.style.color=success?'#1e7653':'#a12236'}
+}
+$('#loginForm').addEventListener('submit',async e=>{
+  e.preventDefault();
+  const button=e.currentTarget.querySelector('button[type="submit"]');
+  const email=String(new FormData(e.currentTarget).get('email')||'').trim();
+  if(!cloud){emailLoginFeedback('אין חיבור לשרת ההתחברות. נסו לרענן את העמוד.');return}
+  if(button){button.disabled=true;button.textContent='שולח קישור...'}
+  try{
+    const {error}=await cloud.auth.signInWithOtp({email,options:{emailRedirectTo:location.origin+location.pathname}});
+    if(error){
+      console.warn('Supabase email OTP rejected',error.code||error.message);
+      const code=error.code||error.error_code||'';
+      const rateLimited=error.status===429||code==='over_email_send_rate_limit'||code==='over_request_rate_limit';
+      const message=code==='email_address_not_authorized'
+        ?'כתובת המייל אינה מורשית לקבל קישורים משירות המייל המובנה של Supabase. יש להוסיף אותה לחברי הארגון או להגדיר SMTP חיצוני.'
+        :rateLimited
+          ?'הגענו למכסת שליחת קישורים ב-Supabase. נסו שוב מאוחר יותר או הגדירו שירות SMTP.'
+          :'לא הצלחנו לשלוח קישור. ניתן לבדוק את הסיבה ביומני Authentication ב-Supabase.';
+      emailLoginFeedback(message);
+      toast('שליחת הקישור נכשלה');
+    }else{
+      emailLoginFeedback('הבקשה נשלחה לשרת. בדקו את תיבת הדואר, ספאם וקידומי מכירות. אם הקישור לא הגיע, יש לבדוק את יומני Authentication.',true);
+      toast('בקשת קישור כניסה נשלחה');
+    }
+  }catch(error){
+    console.warn('Supabase email OTP request failed',error);
+    emailLoginFeedback('שגיאת תקשורת בעת בקשת הקישור. בדקו חיבור ונסו שוב.');
+  }finally{if(button){button.disabled=false;button.textContent='שליחת קישור כניסה למייל'}}
+});
 initCloud();
