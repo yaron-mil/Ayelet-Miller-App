@@ -155,6 +155,40 @@ async function idleUseEmail(){
   if($('#loginForm').hidden)toggleEmailLogin();
 }
 
+
+async function signInWithAccountPassword(){
+  const form=$('#passwordLoginForm'), feedback=$('#passwordLoginFeedback'),button=form.querySelector('button[type="submit"]');
+  const email=String(form.elements.email.value||'').trim(),password=form.elements.password.value;
+  if(!cloud){feedback.textContent='אין חיבור לשירות ההתחברות';return}
+  button.disabled=true;feedback.textContent='מאמת פרטי התחברות...';
+  try {
+    const {error}=await cloud.auth.signInWithPassword({email,password});
+    if(error){console.warn('Password sign in',error.code||error.message);feedback.textContent='הכניסה נכשלה. בדקו את הפרטים, או הגדירו סיסמה מתוך החשבון המחובר.'}
+    else {form.elements.password.value='';feedback.textContent='התחברת בהצלחה'}
+  }catch(error){console.warn('Password sign in',error);feedback.textContent='שגיאת תקשורת. נסו שוב.'}
+  finally{button.disabled=false}
+}
+async function setAccountPassword(){
+  const form=$('#setPasswordForm'),feedback=$('#setPasswordFeedback'),button=form.querySelector('button[type="submit"]');
+  if(!cloudSession||!cloud){feedback.textContent='נדרשת התחברות לחשבון';return}
+  const password=form.elements.newPassword.value,confirmation=form.elements.confirmPassword.value;
+  if(password.length<12){feedback.textContent='הסיסמה צריכה להכיל 12 תווים לפחות';return}
+  if(password!==confirmation){feedback.textContent='הסיסמאות אינן תואמות';return}
+  button.disabled=true;feedback.textContent='שומר סיסמה...';
+  try{
+    const {error}=await cloud.auth.updateUser({password});
+    if(error){console.warn('Password update',error.code||error.message);feedback.textContent='העדכון נכשל. ייתכן שנדרש אימות מחדש של החשבון.'}
+    else{form.reset();feedback.textContent='הסיסמה הוגדרה בהצלחה בחשבון שלך.'}
+  }catch(error){console.warn('Password update',error);feedback.textContent='העדכון נכשל עקב שגיאת תקשורת.'}
+  finally{button.disabled=false}
+}
+function togglePasswordLogin(){
+  const f=$('#passwordLoginForm');
+  f.hidden=!f.hidden;
+  $('#passwordLoginToggle').textContent=f.hidden?'כניסה באמצעות מייל וסיסמה':'הסתרת כניסה עם סיסמה';
+  if(!f.hidden)f.elements.email.focus();
+}
+
 function calc(b){const total=Number(b.servicePrice||0)+Number(b.travelPrice||0),paid=b.depositStatus==='שולמה'?Number(b.depositAmount||0):0;return {total,paid,balance:Math.max(0,total-paid)}}
 function toast(t){const el=$('#toast');el.textContent=t;el.classList.add('show');setTimeout(()=>el.classList.remove('show'),2200)}
 function render(){const now=new Date(),upcoming=data.bookings.filter(b=>b.status!=='בוטלה'&&new Date(`${b.eventDate}T${b.eventTime||'00:00'}`)>=new Date(now.toDateString())).sort((a,b)=>a.eventDate.localeCompare(b.eventDate));const open=data.bookings.filter(b=>!['הושלמה','בוטלה'].includes(b.status));const due=open.reduce((n,b)=>n+calc(b).balance,0);$('#stats').innerHTML=`<div class="stat"><span>אירועים קרובים</span><strong>${upcoming.length}</strong></div><div class="stat"><span>הזמנות פעילות</span><strong>${open.length}</strong></div><div class="stat"><span>לקוחות</span><strong>${new Set(data.bookings.map(b=>b.phone)).size}</strong></div><div class="stat"><span>יתרות פתוחות</span><strong>${money(due)}</strong></div>`;renderList()}
@@ -298,7 +332,7 @@ window.editBooking=id=>{$('#detailsDialog').close();openBooking(data.bookings.fi
 window.duplicateBooking=id=>{const source=data.bookings.find(x=>x.id===id),b={...source,id:'',status:'טיוטה',clientName:source.clientName+' — עותק'};$('#detailsDialog').close();openBooking(b)};
 function priceList(){$('#priceContent').innerHTML=`<div class="dialog-head"><div><p class="eyebrow">הגדרות</p><h2>מחירון</h2></div><button class="close" onclick="priceDialog.close()">×</button></div><div id="prices">${data.prices.map(p=>`<div class="price-row"><input value="${esc(p.name)}" data-id="${p.id}" data-k="name"><input type="number" value="${p.price}" data-id="${p.id}" data-k="price"><button class="secondary" data-del="${p.id}">מחיקה</button></div>`).join('')}</div><div class="dialog-actions"><button class="secondary" id="addPrice">הוספת שירות</button><button class="primary" id="savePrices">שמירה</button></div>`;$('#priceDialog').showModal();$('#addPrice').onclick=()=>{data.prices.push({id:crypto.randomUUID(),name:'שירות חדש',price:0});priceList()};$('#prices').onclick=e=>{if(e.target.dataset.del){data.prices=data.prices.filter(p=>p.id!==e.target.dataset.del);priceList()}};$('#savePrices').onclick=()=>{$('#prices').querySelectorAll('input').forEach(i=>{const p=data.prices.find(x=>x.id===i.dataset.id);p[i.dataset.k]=i.dataset.k==='price'?Number(i.value):i.value});save('המחירון עודכן');$('#priceDialog').close();toast('המחירון נשמר')}}
 function backup(){const blob=new Blob([JSON.stringify({...data,exportedAt:new Date().toISOString()},null,2)],{type:'application/json'}),a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download=`ayelet-miller-backup-${new Date().toISOString().slice(0,10)}.json`;a.click();URL.revokeObjectURL(a.href);toast('קובץ הגיבוי הורד')}
-function settings(){$('#settingsContent').innerHTML=`<div class="dialog-head"><div><p class="eyebrow">גישה מכל מכשיר</p><h2>סנכרון וגיבוי</h2></div><button class="close" onclick="settingsDialog.close()">×</button></div><p>${cloudSession?'הסנכרון המאובטח פעיל. הנתונים זמינים בכל מכשיר עם אותה כתובת מייל.':'כרגע המידע נשמר במכשיר זה בלבד.'}</p><div class="detail-actions"><button class="primary" id="exportNow">הורדת גיבוי</button><button class="secondary" id="restoreNow">שחזור מגיבוי</button>${cloudSession?'<button class="secondary" id="logoutNow">יציאה מהחשבון</button>':''}</div>${cloudSession?'<div style="margin-top:16px"><p><strong>כניסה מאובטחת במכשיר</strong></p><p>לאחר רישום חד־פעמי תוכלו להיכנס באמצעות Face ID, Touch ID או קוד המכשיר. הכניסה במייל תישאר זמינה.</p><button class="primary" id="registerPasskeyBtn" type="button">הפעלת Face ID / Touch ID למכשיר</button></div>':''}`;$('#settingsDialog').showModal();if($('#registerPasskeyBtn'))$('#registerPasskeyBtn').onclick=registerDevicePasskey;$('#exportNow').onclick=backup;$('#restoreNow').onclick=()=>$('#restoreInput').click();if($('#logoutNow'))$('#logoutNow').onclick=async()=>{await cloud.auth.signOut();cloudSession=null;idleWrite(IDLE_LOCK_KEY,'0');$('#settingsDialog').close();if(!$('#loginDialog').open)$('#loginDialog').showModal()}}
+function settings(){$('#settingsContent').innerHTML=`<div class="dialog-head"><div><p class="eyebrow">גישה מכל מכשיר</p><h2>סנכרון וגיבוי</h2></div><button class="close" onclick="settingsDialog.close()">×</button></div><p>${cloudSession?'הסנכרון המאובטח פעיל. הנתונים זמינים בכל מכשיר עם אותה כתובת מייל.':'כרגע המידע נשמר במכשיר זה בלבד.'}</p><div class="detail-actions"><button class="primary" id="exportNow">הורדת גיבוי</button><button class="secondary" id="restoreNow">שחזור מגיבוי</button>${cloudSession?'<button class="secondary" id="logoutNow">יציאה מהחשבון</button>':''}</div>${cloudSession?'<div style="margin-top:16px"><p><strong>כניסה מאובטחת במכשיר</strong></p><p>לאחר רישום חד־פעמי תוכלו להיכנס באמצעות Face ID, Touch ID או קוד המכשיר. הכניסה במייל תישאר זמינה.</p><button class="primary" id="registerPasskeyBtn" type="button">הפעלת Face ID / Touch ID למכשיר</button></div>':''}<div style="border-top:1px solid #eadde2;margin-top:16px;padding-top:14px"><p><strong>הגדרת סיסמה כגיבוי ל-Face ID</strong></p><p style="color:#766d71;font-size:.85rem">יש להגדיר סיסמה בנפרד לכל חשבון. היא נשמרת אצל Supabase ולא באפליקציה.</p><form id="setPasswordForm" autocomplete="off"><label style="display:block">סיסמה חדשה (12 תווים לפחות)<input name="newPassword" type="password" minlength="12" autocomplete="new-password" required style="display:block;width:100%;padding:12px;margin:6px 0 12px"></label><label style="display:block">אימות סיסמה<input name="confirmPassword" type="password" minlength="12" autocomplete="new-password" required style="display:block;width:100%;padding:12px;margin:6px 0 12px"></label><button type="submit" class="secondary">שמירת הסיסמה לחשבון</button><p id="setPasswordFeedback" role="status" aria-live="polite"></p></form></div>`;$('#settingsDialog').showModal();if($('#registerPasskeyBtn'))$('#registerPasskeyBtn').onclick=registerDevicePasskey;if($('#setPasswordForm'))$('#setPasswordForm').addEventListener('submit',async event=>{event.preventDefault();await setAccountPassword()});$('#exportNow').onclick=backup;$('#restoreNow').onclick=()=>$('#restoreInput').click();if($('#logoutNow'))$('#logoutNow').onclick=async()=>{await cloud.auth.signOut();cloudSession=null;idleWrite(IDLE_LOCK_KEY,'0');$('#settingsDialog').close();if(!$('#loginDialog').open)$('#loginDialog').showModal()}}
 $('#todayLabel').textContent=new Date().toLocaleDateString('he-IL',{weekday:'long',day:'numeric',month:'long'});
 $('#newBookingBtn').onclick=()=>openBooking();$('#bookingForm').addEventListener('submit',submitBooking);$('#bookingForm').addEventListener('input',updateTotals);$('#serviceSelect').onchange=e=>{toggleOtherService();const o=e.target.selectedOptions[0];if(o.dataset.price)$('#bookingForm').elements.servicePrice.value=o.dataset.price;updateTotals()};document.querySelectorAll('[data-close]').forEach(b=>b.onclick=()=>b.closest('dialog').close());$('#searchInput').oninput=renderList;$('#statusFilter').onchange=renderList;$('#bookingList').onclick=e=>{const el=e.target.closest('.booking');if(el)detail(el.dataset.id)};$('#bookingList').onkeydown=e=>{if(e.key==='Enter')detail(e.target.closest('.booking')?.dataset.id)};$('#priceListBtn').onclick=priceList;$('#backupBtn').onclick=backup;$('#settingsBtn').onclick=settings;$('#restoreInput').onchange=async e=>{try{const restored=JSON.parse(await e.target.files[0].text());if(!Array.isArray(restored.bookings)||!Array.isArray(restored.prices))throw 0;data={...seed,...restored};save('שוחזר גיבוי');toast('הגיבוי שוחזר בהצלחה')}catch{toast('קובץ הגיבוי אינו תקין')}};
 services();render();
@@ -306,6 +340,7 @@ function emailLoginFeedback(message,success=false){
   const panel=$('#loginEmailFeedback');
   if(panel){panel.textContent=message;panel.hidden=false;panel.style.color=success?'#1e7653':'#a12236'}
 }
+$('#passwordLoginForm').addEventListener('submit',async event=>{event.preventDefault();await signInWithAccountPassword()});
 $('#loginForm').addEventListener('submit',async e=>{
   e.preventDefault();
   const button=e.currentTarget.querySelector('button[type="submit"]');

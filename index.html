@@ -92,6 +92,12 @@
       <p style="margin:4px 0 18px;color:#766d71">כניסה מהירה באמצעות זיהוי המכשיר, ללא הקלדת מייל בכל כניסה.</p>
       <button type="button" id="passkeyLoginBtn" class="primary" style="width:100%;font-size:1.05rem;padding:16px" onclick="signInWithDevice()">כניסה עם Face ID / Touch ID</button>
       <p style="text-align:center;color:#766d71;font-size:.82rem;margin:11px 0">בפעם הראשונה יש להירשם באמצעות המייל ולהפעיל זיהוי בהגדרות.</p>
+      <button id="passwordLoginToggle" type="button" class="secondary" style="width:100%;margin-bottom:12px" onclick="togglePasswordLogin()">כניסה באמצעות מייל וסיסמה</button>
+      <form id="passwordLoginForm" hidden style="margin-bottom:14px">
+      <label style="display:block">כתובת מייל<input name="email" type="email" required autocomplete="username" style="display:block;width:100%;padding:12px;margin:5px 0 12px"></label>
+      <label style="display:block">סיסמה<input name="password" type="password" required autocomplete="current-password" style="display:block;width:100%;padding:12px;margin:5px 0 12px"></label>
+      <button type="submit" class="primary" style="width:100%">כניסה לחשבון</button>
+      <p id="passwordLoginFeedback" role="status" aria-live="polite" style="font-size:.85rem;color:#87163C"></p></form>
       <button type="button" id="emailLoginToggle" class="secondary" style="width:100%;margin-bottom:12px" onclick="toggleEmailLogin()">כניסה ראשונה / כניסה באמצעות מייל</button>
       <form id="loginForm" hidden>
         <label style="display:block">כתובת מייל<input name="email" type="email" required autocomplete="email" inputmode="email" placeholder="name@example.com" style="display:block;width:100%;margin:7px 0 12px;padding:12px;border:1px solid #dccbd1;border-radius:10px"></label>
@@ -114,6 +120,6 @@
   <div id="toast" role="status" aria-live="polite"></div>
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.105.0"></script>
   <script src="html2pdf.bundle.min.js"></script>
-  <script src="app.js?v=20261030-3"></script>
+  <script src="app.js?v=20261030-4"></script>
 </body>
 </html>
