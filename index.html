@@ -79,18 +79,23 @@
   <dialog id="priceDialog"><div id="priceContent"></div></dialog>
   <dialog id="settingsDialog"><div id="settingsContent"></div></dialog>
   <dialog id="loginDialog">
-    <form id="loginForm">
-      <div class="dialog-head"><div><p class="eyebrow">כניסה מאובטחת</p><h2>המידע שלך, בכל מכשיר</h2></div></div>
-      <p>אפשר להיכנס עם Face ID / Touch ID אחרי רישום המכשיר, או באמצעות קישור חד־פעמי למייל.</p>
-      <button type="button" id="passkeyLoginBtn" class="primary" style="width:100%;margin-bottom:14px" onclick="signInWithDevice()">כניסה עם Face ID / Touch ID</button><label>כתובת מייל<input name="email" type="email" required autocomplete="email" placeholder="name@example.com"></label>
-      <div class="dialog-actions"><button type="submit" class="primary">שליחת קישור כניסה</button></div>
-      <small>הנתונים נשמרים בענן רק לאחר כניסה.</small>
-    </form>
+    <div class="login-shell">
+      <div class="dialog-head"><div><p class="eyebrow">AYELET MILLER</p><h2>כניסה מאובטחת</h2></div></div>
+      <p style="margin:4px 0 18px;color:#766d71">כניסה מהירה באמצעות זיהוי המכשיר, ללא הקלדת מייל בכל כניסה.</p>
+      <button type="button" id="passkeyLoginBtn" class="primary" style="width:100%;font-size:1.05rem;padding:16px" onclick="signInWithDevice()">כניסה עם Face ID / Touch ID</button>
+      <p style="text-align:center;color:#766d71;font-size:.82rem;margin:11px 0">בפעם הראשונה יש להירשם באמצעות המייל ולהפעיל זיהוי בהגדרות.</p>
+      <button type="button" id="emailLoginToggle" class="secondary" style="width:100%;margin-bottom:12px" onclick="toggleEmailLogin()">כניסה ראשונה / כניסה באמצעות מייל</button>
+      <form id="loginForm" hidden>
+        <label style="display:block">כתובת מייל<input name="email" type="email" required autocomplete="email" inputmode="email" placeholder="name@example.com" style="display:block;width:100%;margin:7px 0 12px;padding:12px;border:1px solid #dccbd1;border-radius:10px"></label>
+        <button type="submit" class="primary" style="width:100%">שליחת קישור כניסה למייל</button>
+      </form>
+      <small style="display:block;color:#766d71;margin-top:14px">אפשר תמיד להמשיך להיכנס עם המייל במקרה שהמכשיר לא רשום או הוחלף.</small>
+    </div>
   </dialog>
   <input id="restoreInput" type="file" accept="application/json" hidden>
   <div id="toast" role="status" aria-live="polite"></div>
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.105.0"></script>
   <script src="html2pdf.bundle.min.js"></script>
-  <script src="app.js?v=20261029-1"></script>
+  <script src="app.js?v=20261030-1"></script>
 </body>
 </html>
