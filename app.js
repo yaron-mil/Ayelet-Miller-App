@@ -10,7 +10,28 @@ function load(){try{return {...structuredClone(seed),...JSON.parse(localStorage.
 function save(action='עדכון נתונים'){data.history.unshift({id:crypto.randomUUID(),at:new Date().toISOString(),action});data.history=data.history.slice(0,250);localStorage.setItem(STORE,JSON.stringify(data));render();syncCloud()}
 function syncCloud(){if(!cloudSession||!cloud)return;clearTimeout(syncTimer);syncTimer=setTimeout(async()=>{const {error}=await cloud.from('app_state').upsert({workspace_id:'main',user_id:cloudSession.user.id,payload:data,updated_at:new Date().toISOString()},{onConflict:'workspace_id'});toast(error?'השמירה בענן נכשלה — נשמר גיבוי במכשיר':'נשמר בענן')},350)}
 async function loadCloud(){const {data:row,error}=await cloud.from('app_state').select('payload').eq('workspace_id','main').maybeSingle();if(error){toast('הגישה למאגר לא אושרה');return}if(row?.payload){data={...structuredClone(seed),...row.payload};localStorage.setItem(STORE,JSON.stringify(data));render();toast('הנתונים סונכרנו')}else syncCloud()}
-async function initCloud(){if(['127.0.0.1','localhost'].includes(location.hostname))return;if(!window.supabase){toast('אין חיבור לשירות הנתונים');return}cloud=window.supabase.createClient(SUPABASE_URL,SUPABASE_KEY,{auth:{experimental:{passkey:true}}});const {data:{session}}=await cloud.auth.getSession();cloudSession=session;cloud.auth.onAuthStateChange(async(_event,next)=>{cloudSession=next;if(next){$('#loginDialog').close();await loadCloud()}});if(session)await loadCloud();else $('#loginDialog').showModal()}
+async function initCloud(){
+  if(['127.0.0.1','localhost'].includes(location.hostname)){document.documentElement.classList.add('auth-ready');return}
+  if(!window.supabase){toast('אין חיבור לשירות הנתונים');$('#loginDialog').showModal();document.documentElement.classList.add('auth-ready');return}
+  try{
+    cloud=window.supabase.createClient(SUPABASE_URL,SUPABASE_KEY,{auth:{experimental:{passkey:true}}});
+    const {data:{session}}=await cloud.auth.getSession();
+    cloudSession=session;
+    cloud.auth.onAuthStateChange(async(event,next)=>{
+      cloudSession=next;
+      if(next){
+        // Never dismiss the inactivity lock from a refresh or auth callback.
+        if(!idleLocked){$('#loginDialog').close();idleStart();await loadCloud()}
+      }else if(event==='SIGNED_OUT'&&!idleLocked){
+        idleWrite(IDLE_LOCK_KEY,'0');
+        if(!$('#loginDialog').open)$('#loginDialog').showModal();
+      }
+    });
+    if(session){idleStart();await loadCloud()}
+    else {idleWrite(IDLE_LOCK_KEY,'0');$('#loginDialog').showModal()}
+  }catch(error){console.error('Supabase initialization failed',error);toast('לא ניתן להשלים התחברות');if(!$('#loginDialog').open)$('#loginDialog').showModal()}
+  finally{document.documentElement.classList.add('auth-ready')}
+}
 
 const passkeySupported=()=>window.isSecureContext&&!!window.PublicKeyCredential;
 function passkeyMessage(error){
@@ -53,6 +74,85 @@ async function registerDevicePasskey(){
     toast('המכשיר נרשם בהצלחה לכניסה מאובטחת');
   }catch(error){console.warn('Passkey registration',error);toast(passkeyMessage(error))}
   finally{if(btn){btn.disabled=false;btn.textContent='הפעלת Face ID / Touch ID למכשיר'}}
+}
+
+
+const IDLE_LOCK_MS=5*60*1000;
+const IDLE_LAST_KEY='ayelet-idle-last-active-v1';
+const IDLE_LOCK_KEY='ayelet-idle-locked-v1';
+let idleLocked=false,idleStarted=false,idleUnlocking=false,idleExpectedUserId=null,lastIdleActivity=0;
+const idleStamp=()=>{try{return Number(localStorage.getItem(IDLE_LAST_KEY))||0}catch{return 0}};
+const idleFlag=()=>{try{return localStorage.getItem(IDLE_LOCK_KEY)==='1'}catch{return false}};
+function idleWrite(key,value){try{localStorage.setItem(key,String(value))}catch(error){console.warn('Could not store idle lock state',error)}}
+function idleMarkActivity(){
+  if(idleLocked||document.hidden||!cloudSession)return;
+  const now=Date.now();
+  if(now-lastIdleActivity<1000)return;
+  lastIdleActivity=now;
+  idleWrite(IDLE_LAST_KEY,now);
+}
+function idleSetLocked(locked){
+  idleLocked=locked;
+  const panel=$('#idleLock');
+  panel.hidden=!locked;
+  document.body.classList.toggle('idle-locked',locked);
+  idleWrite(IDLE_LOCK_KEY,locked?'1':'0');
+  if(locked){idleExpectedUserId=cloudSession?.user?.id||idleExpectedUserId;panel.querySelector('#idleLockStatus').textContent='המערכת ננעלה לאחר 5 דקות ללא פעילות.';}
+  else {idleExpectedUserId=null;idleMarkActivity()}
+}
+function idleCheck(){
+  if(!cloudSession||idleLocked)return;
+  const previous=idleStamp();
+  if(previous&&Date.now()-previous>=IDLE_LOCK_MS)idleSetLocked(true);
+}
+function idleStart(){
+  if(!cloudSession)return;
+  if(!idleStarted){
+    idleStarted=true;
+    for(const evt of ['pointerdown','keydown','input','touchstart'])document.addEventListener(evt,idleMarkActivity,{passive:true,capture:true});
+    document.addEventListener('visibilitychange',()=>{if(!document.hidden)idleCheck()});
+    window.addEventListener('focus',idleCheck);
+    window.addEventListener('pageshow',idleCheck);
+    setInterval(idleCheck,10000);
+  }
+  if(idleFlag()||(idleStamp()&&Date.now()-idleStamp()>=IDLE_LOCK_MS))idleSetLocked(true);
+  else idleMarkActivity();
+}
+async function idleUnlockWithPasskey(){
+  if(idleUnlocking||!idleLocked)return;
+  const status=$('#idleLockStatus');
+  if(!passkeySupported()||!cloud||typeof cloud.auth.signInWithPasskey!=='function'){
+    status.textContent='זיהוי מכשיר אינו זמין. אפשר להיכנס מחדש באמצעות המייל.';return;
+  }
+  const expected=idleExpectedUserId;
+  const button=$('#idleUnlockBtn');
+  idleUnlocking=true;button.disabled=true;status.textContent='מאמת את זהותך במכשיר...';
+  try{
+    const {data:result,error}=await cloud.auth.signInWithPasskey();
+    if(error)throw error;
+    const current=result?.user?.id||result?.session?.user?.id;
+    if(!current||current!==expected){
+      status.textContent='מפתח הכניסה שייך לחשבון אחר. יש להתחבר מחדש עם המייל המתאים.';
+      await cloud.auth.signOut();
+      cloudSession=null;
+      return;
+    }
+    idleSetLocked(false);
+    status.textContent='זוהית בהצלחה';
+  }catch(error){
+    console.warn('Idle passkey unlock failed',error);
+    status.textContent=passkeyMessage(error);
+  }finally{idleUnlocking=false;button.disabled=false}
+}
+async function idleUseEmail(){
+  if(!idleLocked||idleUnlocking)return;
+  // Force a fresh authentication before allowing the app to be viewed.
+  try{if(cloud)await cloud.auth.signOut()}catch(error){console.warn('Sign out for email fallback',error)}
+  cloudSession=null;
+  idleSetLocked(false);
+  idleWrite(IDLE_LAST_KEY,Date.now());
+  $('#loginDialog').showModal();
+  if($('#loginForm').hidden)toggleEmailLogin();
 }
 
 function calc(b){const total=Number(b.servicePrice||0)+Number(b.travelPrice||0),paid=b.depositStatus==='שולמה'?Number(b.depositAmount||0):0;return {total,paid,balance:Math.max(0,total-paid)}}
@@ -198,7 +298,7 @@ window.editBooking=id=>{$('#detailsDialog').close();openBooking(data.bookings.fi
 window.duplicateBooking=id=>{const source=data.bookings.find(x=>x.id===id),b={...source,id:'',status:'טיוטה',clientName:source.clientName+' — עותק'};$('#detailsDialog').close();openBooking(b)};
 function priceList(){$('#priceContent').innerHTML=`<div class="dialog-head"><div><p class="eyebrow">הגדרות</p><h2>מחירון</h2></div><button class="close" onclick="priceDialog.close()">×</button></div><div id="prices">${data.prices.map(p=>`<div class="price-row"><input value="${esc(p.name)}" data-id="${p.id}" data-k="name"><input type="number" value="${p.price}" data-id="${p.id}" data-k="price"><button class="secondary" data-del="${p.id}">מחיקה</button></div>`).join('')}</div><div class="dialog-actions"><button class="secondary" id="addPrice">הוספת שירות</button><button class="primary" id="savePrices">שמירה</button></div>`;$('#priceDialog').showModal();$('#addPrice').onclick=()=>{data.prices.push({id:crypto.randomUUID(),name:'שירות חדש',price:0});priceList()};$('#prices').onclick=e=>{if(e.target.dataset.del){data.prices=data.prices.filter(p=>p.id!==e.target.dataset.del);priceList()}};$('#savePrices').onclick=()=>{$('#prices').querySelectorAll('input').forEach(i=>{const p=data.prices.find(x=>x.id===i.dataset.id);p[i.dataset.k]=i.dataset.k==='price'?Number(i.value):i.value});save('המחירון עודכן');$('#priceDialog').close();toast('המחירון נשמר')}}
 function backup(){const blob=new Blob([JSON.stringify({...data,exportedAt:new Date().toISOString()},null,2)],{type:'application/json'}),a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download=`ayelet-miller-backup-${new Date().toISOString().slice(0,10)}.json`;a.click();URL.revokeObjectURL(a.href);toast('קובץ הגיבוי הורד')}
-function settings(){$('#settingsContent').innerHTML=`<div class="dialog-head"><div><p class="eyebrow">גישה מכל מכשיר</p><h2>סנכרון וגיבוי</h2></div><button class="close" onclick="settingsDialog.close()">×</button></div><p>${cloudSession?'הסנכרון המאובטח פעיל. הנתונים זמינים בכל מכשיר עם אותה כתובת מייל.':'כרגע המידע נשמר במכשיר זה בלבד.'}</p><div class="detail-actions"><button class="primary" id="exportNow">הורדת גיבוי</button><button class="secondary" id="restoreNow">שחזור מגיבוי</button>${cloudSession?'<button class="secondary" id="logoutNow">יציאה מהחשבון</button>':''}</div>${cloudSession?'<div style="margin-top:16px"><p><strong>כניסה מאובטחת במכשיר</strong></p><p>לאחר רישום חד־פעמי תוכלו להיכנס באמצעות Face ID, Touch ID או קוד המכשיר. הכניסה במייל תישאר זמינה.</p><button class="primary" id="registerPasskeyBtn" type="button">הפעלת Face ID / Touch ID למכשיר</button></div>':''}`;$('#settingsDialog').showModal();if($('#registerPasskeyBtn'))$('#registerPasskeyBtn').onclick=registerDevicePasskey;$('#exportNow').onclick=backup;$('#restoreNow').onclick=()=>$('#restoreInput').click();if($('#logoutNow'))$('#logoutNow').onclick=async()=>{await cloud.auth.signOut();cloudSession=null;$('#settingsDialog').close();$('#loginDialog').showModal()}}
+function settings(){$('#settingsContent').innerHTML=`<div class="dialog-head"><div><p class="eyebrow">גישה מכל מכשיר</p><h2>סנכרון וגיבוי</h2></div><button class="close" onclick="settingsDialog.close()">×</button></div><p>${cloudSession?'הסנכרון המאובטח פעיל. הנתונים זמינים בכל מכשיר עם אותה כתובת מייל.':'כרגע המידע נשמר במכשיר זה בלבד.'}</p><div class="detail-actions"><button class="primary" id="exportNow">הורדת גיבוי</button><button class="secondary" id="restoreNow">שחזור מגיבוי</button>${cloudSession?'<button class="secondary" id="logoutNow">יציאה מהחשבון</button>':''}</div>${cloudSession?'<div style="margin-top:16px"><p><strong>כניסה מאובטחת במכשיר</strong></p><p>לאחר רישום חד־פעמי תוכלו להיכנס באמצעות Face ID, Touch ID או קוד המכשיר. הכניסה במייל תישאר זמינה.</p><button class="primary" id="registerPasskeyBtn" type="button">הפעלת Face ID / Touch ID למכשיר</button></div>':''}`;$('#settingsDialog').showModal();if($('#registerPasskeyBtn'))$('#registerPasskeyBtn').onclick=registerDevicePasskey;$('#exportNow').onclick=backup;$('#restoreNow').onclick=()=>$('#restoreInput').click();if($('#logoutNow'))$('#logoutNow').onclick=async()=>{await cloud.auth.signOut();cloudSession=null;idleWrite(IDLE_LOCK_KEY,'0');$('#settingsDialog').close();if(!$('#loginDialog').open)$('#loginDialog').showModal()}}
 $('#todayLabel').textContent=new Date().toLocaleDateString('he-IL',{weekday:'long',day:'numeric',month:'long'});
 $('#newBookingBtn').onclick=()=>openBooking();$('#bookingForm').addEventListener('submit',submitBooking);$('#bookingForm').addEventListener('input',updateTotals);$('#serviceSelect').onchange=e=>{toggleOtherService();const o=e.target.selectedOptions[0];if(o.dataset.price)$('#bookingForm').elements.servicePrice.value=o.dataset.price;updateTotals()};document.querySelectorAll('[data-close]').forEach(b=>b.onclick=()=>b.closest('dialog').close());$('#searchInput').oninput=renderList;$('#statusFilter').onchange=renderList;$('#bookingList').onclick=e=>{const el=e.target.closest('.booking');if(el)detail(el.dataset.id)};$('#bookingList').onkeydown=e=>{if(e.key==='Enter')detail(e.target.closest('.booking')?.dataset.id)};$('#priceListBtn').onclick=priceList;$('#backupBtn').onclick=backup;$('#settingsBtn').onclick=settings;$('#restoreInput').onchange=async e=>{try{const restored=JSON.parse(await e.target.files[0].text());if(!Array.isArray(restored.bookings)||!Array.isArray(restored.prices))throw 0;data={...seed,...restored};save('שוחזר גיבוי');toast('הגיבוי שוחזר בהצלחה')}catch{toast('קובץ הגיבוי אינו תקין')}};
 services();render();
