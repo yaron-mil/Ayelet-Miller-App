@@ -96,6 +96,7 @@
       <form id="loginForm" hidden>
         <label style="display:block">כתובת מייל<input name="email" type="email" required autocomplete="email" inputmode="email" placeholder="name@example.com" style="display:block;width:100%;margin:7px 0 12px;padding:12px;border:1px solid #dccbd1;border-radius:10px"></label>
         <button type="submit" class="primary" style="width:100%">שליחת קישור כניסה למייל</button>
+        <p id="loginEmailFeedback" role="status" aria-live="polite" hidden style="font-size:.86rem;line-height:1.55;margin-top:11px"></p>
       </form>
       <small style="display:block;color:#766d71;margin-top:14px">אפשר תמיד להמשיך להיכנס עם המייל במקרה שהמכשיר לא רשום או הוחלף.</small>
     </div>
@@ -113,6 +114,6 @@
   <div id="toast" role="status" aria-live="polite"></div>
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.105.0"></script>
   <script src="html2pdf.bundle.min.js"></script>
-  <script src="app.js?v=20261030-2"></script>
+  <script src="app.js?v=20261030-3"></script>
 </body>
 </html>
