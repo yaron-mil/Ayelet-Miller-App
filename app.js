@@ -16,10 +16,17 @@ const passkeySupported=()=>window.isSecureContext&&!!window.PublicKeyCredential;
 function passkeyMessage(error){
   const code=error?.code||error?.error_code||'';
   if(code==='passkey_disabled')return 'יש להפעיל Passkeys בלוח הבקרה של Supabase';
+  if(code==='webauthn_credential_not_found')return 'לא נמצא מפתח כניסה רשום לחשבון. היכנסו במייל ורשמו את המכשיר בהגדרות';
   if(error?.name==='NotAllowedError'||error?.name==='AbortError')return 'הזיהוי בוטל או לא אושר';
   if(code==='webauthn_credential_exists')return 'המכשיר כבר נרשם לחשבון';
   if(code==='webauthn_verification_failed')return 'אימות המכשיר נכשל — נסו שוב';
   return 'זיהוי באמצעות המכשיר נכשל. אפשר להיכנס במייל';
+}
+function toggleEmailLogin(){
+  const f=$('#loginForm');
+  f.hidden=!f.hidden;
+  $('#emailLoginToggle').textContent=f.hidden?'כניסה ראשונה / כניסה באמצעות מייל':'הסתרת הכניסה במייל';
+  if(!f.hidden)f.elements.email.focus();
 }
 async function signInWithDevice(){
   if(!cloud||!passkeySupported()||typeof cloud.auth.signInWithPasskey!=='function'){
