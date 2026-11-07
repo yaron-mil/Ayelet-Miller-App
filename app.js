@@ -20,8 +20,17 @@ async function initCloud(){
     cloud.auth.onAuthStateChange(async(event,next)=>{
       cloudSession=next;
       if(next){
-        // Never dismiss the inactivity lock from a refresh or auth callback.
-        if(!idleLocked){$('#loginDialog').close();idleStart();await loadCloud()}
+        // A genuine fresh sign-in is sufficient to clear an old local inactivity lock.
+        // Token refresh and restored sessions must never unlock the screen.
+        if(event==='SIGNED_IN' && idleLocked){
+          idleSetLocked(false);
+          idleWrite(IDLE_LAST_KEY,Date.now());
+        }
+        if(!idleLocked){
+          if($('#loginDialog').open)$('#loginDialog').close();
+          idleStart();
+          await loadCloud();
+        }
       }else if(event==='SIGNED_OUT'&&!idleLocked){
         idleWrite(IDLE_LOCK_KEY,'0');
         if(!$('#loginDialog').open)$('#loginDialog').showModal();
