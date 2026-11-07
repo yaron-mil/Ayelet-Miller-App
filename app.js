@@ -182,6 +182,20 @@ async function idleUnlockWithPassword(){
 }
 
 
+async function idleRestartEmailAuthentication(){
+  if(idleUnlocking)return;
+  // Explicit user-requested recovery: revoke this browser session and start a fresh email login.
+  // Cached customer records remain concealed behind the login dialog.
+  try{if(cloud)await cloud.auth.signOut()}catch(error){console.warn('Email recovery sign-out failed',error?.code||error?.name)}
+  cloudSession=null;
+  idleSetLocked(false);
+  idleWrite(IDLE_LAST_KEY,Date.now());
+  const dialog=$('#loginDialog');
+  if(!dialog.open)dialog.showModal();
+  if($('#loginForm').hidden)toggleEmailLogin();
+}
+
+
 async function signInWithAccountPassword(){
   const form=$('#passwordLoginForm'), feedback=$('#passwordLoginFeedback'),button=form.querySelector('button[type="submit"]');
   const email=String(form.elements.email.value||'').trim(),password=form.elements.password.value;
