@@ -113,13 +113,19 @@
       <h2 id="idleLockTitle">הגישה לממשק נעולה</h2>
       <p id="idleLockStatus">המערכת ננעלה לאחר 5 דקות ללא פעילות.</p>
       <button class="primary" type="button" id="idleUnlockBtn" onclick="idleUnlockWithPasskey()">פתיחה עם Face ID / Touch ID</button>
-      <button class="secondary" type="button" onclick="idleUseEmail()">כניסה מחדש באמצעות המייל</button>
+      <button class="secondary" type="button" onclick="idleUseEmail()">כניסה עם סיסמת גיבוי</button>
+      <form id="idlePasswordForm" hidden onsubmit="event.preventDefault();idleUnlockWithPassword()">
+        <label>מייל החשבון<input type="email" name="email" autocomplete="username" required></label>
+        <label>סיסמה<input type="password" name="password" autocomplete="current-password" required></label>
+        <button class="primary" type="submit">פתיחת האפליקציה</button>
+        <p id="idlePasswordFeedback" role="status" aria-live="polite"></p>
+      </form>
     </div>
   </div>
   <input id="restoreInput" type="file" accept="application/json" hidden>
   <div id="toast" role="status" aria-live="polite"></div>
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.105.0"></script>
   <script src="html2pdf.bundle.min.js"></script>
-  <script src="app.js?v=20261030-4"></script>
+  <script src="app.js?v=20261107-session-unlock-1"></script>
 </body>
 </html>
