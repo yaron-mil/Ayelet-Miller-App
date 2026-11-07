@@ -20,8 +20,17 @@ async function initCloud(){
     cloud.auth.onAuthStateChange(async(event,next)=>{
       cloudSession=next;
       if(next){
-        // Never dismiss the inactivity lock from a refresh or auth callback.
-        if(!idleLocked){$('#loginDialog').close();idleStart();await loadCloud()}
+        // A genuine fresh sign-in is sufficient to clear an old local inactivity lock.
+        // Token refresh and restored sessions must never unlock the screen.
+        if(event==='SIGNED_IN' && idleLocked){
+          idleSetLocked(false);
+          idleWrite(IDLE_LAST_KEY,Date.now());
+        }
+        if(!idleLocked){
+          if($('#loginDialog').open)$('#loginDialog').close();
+          idleStart();
+          await loadCloud();
+        }
       }else if(event==='SIGNED_OUT'&&!idleLocked){
         idleWrite(IDLE_LOCK_KEY,'0');
         if(!$('#loginDialog').open)$('#loginDialog').showModal();
@@ -146,12 +155,52 @@ async function idleUnlockWithPasskey(){
 }
 async function idleUseEmail(){
   if(!idleLocked||idleUnlocking)return;
-  // Force a fresh authentication before allowing the app to be viewed.
-  try{if(cloud)await cloud.auth.signOut()}catch(error){console.warn('Sign out for email fallback',error)}
+  // Do not sign out: the existing Supabase session is needed for seamless sync.
+  const form=$('#idlePasswordForm');
+  form.hidden=!form.hidden;
+  $('#idlePasswordFeedback').textContent='';
+  if(!form.hidden)form.elements.email.focus();
+}
+async function idleUnlockWithPassword(){
+  if(!idleLocked||idleUnlocking||!cloud)return;
+  const form=$('#idlePasswordForm'),feedback=$('#idlePasswordFeedback');
+  const email=String(form.elements.email.value||'').trim();
+  const password=form.elements.password.value;
+  const expected=idleExpectedUserId;
+  idleUnlocking=true;
+  const button=form.querySelector('button[type="submit"]');
+  button.disabled=true;feedback.textContent='מאמת פרטי התחברות...';
+  try{
+    const {data:result,error}=await cloud.auth.signInWithPassword({email,password});
+    if(error)throw error;
+    if(!result?.user?.id||result.user.id!==expected){
+      // Never expose the previous user's cached customer data to another account.
+      await cloud.auth.signOut();
+      cloudSession=null;
+      feedback.textContent='החשבון שונה מהחשבון שננעל. יש להתחבר מחדש לחשבון המתאים.';
+      return;
+    }
+    cloudSession=result.session;
+    form.reset();form.hidden=true;
+    idleSetLocked(false);
+    feedback.textContent='';
+  }catch(error){
+    console.warn('Idle password unlock failed',error?.code||error?.name);
+    feedback.textContent='לא ניתן לאמת את הפרטים. בדקו את המייל והסיסמה.';
+  }finally{idleUnlocking=false;button.disabled=false}
+}
+
+
+async function idleRestartEmailAuthentication(){
+  if(idleUnlocking)return;
+  // Explicit user-requested recovery: revoke this browser session and start a fresh email login.
+  // Cached customer records remain concealed behind the login dialog.
+  try{if(cloud)await cloud.auth.signOut()}catch(error){console.warn('Email recovery sign-out failed',error?.code||error?.name)}
   cloudSession=null;
   idleSetLocked(false);
   idleWrite(IDLE_LAST_KEY,Date.now());
-  $('#loginDialog').showModal();
+  const dialog=$('#loginDialog');
+  if(!dialog.open)dialog.showModal();
   if($('#loginForm').hidden)toggleEmailLogin();
 }
 
