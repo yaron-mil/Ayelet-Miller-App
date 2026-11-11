@@ -240,8 +240,8 @@ function togglePasswordLogin(){
 
 
 let activeView='bookings';
-const normalizeName=s=>String(s||'').trim().replace(/\\s+/g,' ').toLocaleLowerCase('he-IL');
-function normalizePhone(s){const n=String(s||'').replace(/[\\s().-]/g,'');const local=n.startsWith('+972')?'0'+n.slice(4):n.startsWith('972')?'0'+n.slice(3):n;return /^05[0-9]{8}$/.test(local)?local:null}
+const normalizeName=s=>String(s||'').trim().replace(/\s+/g,' ').toLocaleLowerCase('he-IL');
+function normalizePhone(s){const n=String(s||'').replace(/[\s().-]/g,'');const local=n.startsWith('+972')?'0'+n.slice(4):n.startsWith('972')?'0'+n.slice(3):n;return /^05[0-9]{8}$/.test(local)?local:null}
 function ensureClients(){
   if(!Array.isArray(data.clients))data.clients=[];
   if(!data.birthdaySettings)data.birthdaySettings=structuredClone(seed.birthdaySettings);
@@ -254,7 +254,7 @@ function ensureClients(){
   }
 }
 function birthdayDays(c){
-  if(!/^\\d{2}-\\d{2}$/.test(c.birthday||''))return null;
+  if(!/^\d{2}-\d{2}$/.test(c.birthday||''))return null;
   const [m,d]=c.birthday.split('-').map(Number),today=new Date();today.setHours(0,0,0,0);
   for(let year=today.getFullYear();year<=today.getFullYear()+4;year++){
     const next=new Date(year,m-1,d);if(next.getMonth()!==m-1||next.getDate()!==d)continue;
@@ -269,7 +269,7 @@ function setView(view){
 }
 function renderClients(){
   ensureClients();const q=($('#clientSearch')?.value||'').trim().toLowerCase(),days=Number(data.birthdaySettings.daysAhead)||7;
-  const items=data.clients.filter(c=>!q||c.fullName.toLowerCase().includes(q)||c.phone.includes(q.replace(/\\D/g,'')));
+  const items=data.clients.filter(c=>!q||c.fullName.toLowerCase().includes(q)||c.phone.includes(q.replace(/\D/g,'')));
   $('#clientCount').textContent=data.clients.length;
   const soon=data.clients.map(c=>({c,b:birthdayDays(c)})).filter(x=>x.b&&x.b.days<=days).sort((a,b)=>a.b.days-b.b.days);
   $('#birthdayCount').textContent=soon.length;
@@ -290,7 +290,7 @@ function openClient(id){
 function submitClient(e){
   e.preventDefault();const f=e.currentTarget,o=Object.fromEntries(new FormData(f)),id=o.id,phone=normalizePhone(o.phone);
   if(!phone){toast('יש להזין מספר נייד ישראלי תקין');return}
-  o.fullName=o.fullName.trim().replace(/\\s+/g,' ');
+  o.fullName=o.fullName.trim().replace(/\s+/g,' ');
   if(o.fullName.split(' ').length<2){toast('יש להזין שם פרטי ושם משפחה');return}
   const duplicatePhone=data.clients.find(c=>c.id!==id&&normalizePhone(c.phone)===phone);
   if(duplicatePhone){toast('הטלפון כבר שייך ללקוחה '+duplicatePhone.fullName);return}
@@ -307,7 +307,7 @@ function submitClient(e){
 function syncBookingClient(obj){
   ensureClients();const phone=normalizePhone(obj.phone);
   if(!phone){toast('יש להזין מספר נייד ישראלי תקין');return false}
-  obj.phone=phone;obj.clientName=obj.clientName.trim().replace(/\\s+/g,' ');
+  obj.phone=phone;obj.clientName=obj.clientName.trim().replace(/\s+/g,' ');
   if(obj.clientName.split(' ').length<2){toast('יש להזין שם פרטי ושם משפחה');return false}
   const existing=data.clients.find(c=>normalizePhone(c.phone)===phone);
   if(existing){
