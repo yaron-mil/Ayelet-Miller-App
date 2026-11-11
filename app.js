@@ -27,8 +27,10 @@ function mergeOperations(remote,ops){
   merged.bookings=(merged.bookings||[]).filter(x=>!deleted[x.id]);
   return merged;
 }
+let saveStatusTimer;
 function showSaveStatus(message,failed=false){
-  const el=$('#clientSaveStatus');if(el){el.hidden=false;el.textContent=message;el.classList.toggle('save-failed',failed)}
+  const el=$('#clientSaveStatus');
+  if(el){clearTimeout(saveStatusTimer);el.hidden=false;el.textContent=message;el.classList.toggle('save-failed',failed);saveStatusTimer=setTimeout(()=>{el.hidden=true;el.textContent=''},failed?6500:3000)}
   toast(message)
 }
 function save(action='עדכון נתונים'){
@@ -421,7 +423,7 @@ function toast(t){
  const dialog=Array.from(document.querySelectorAll('dialog[open]')).at(-1);
  const el=dialog?.querySelector('.dialog-feedback')||$('#toast');
  el.textContent=t;el.classList.add('show');clearTimeout(toastTimeout);
- toastTimeout=setTimeout(()=>{el.classList.remove('show');if(el.classList.contains('dialog-feedback'))el.textContent=''},4500)
+ toastTimeout=setTimeout(()=>{el.classList.remove('show');if(el.classList.contains('dialog-feedback'))el.textContent=''},3000)
 }
 function render(){ensureClients();const now=new Date(),upcoming=data.bookings.filter(b=>b.status!=='בוטלה'&&new Date(`${b.eventDate}T${b.eventTime||'00:00'}`)>=new Date(now.toDateString())).sort((a,b)=>a.eventDate.localeCompare(b.eventDate));const open=data.bookings.filter(b=>!['הושלמה','בוטלה'].includes(b.status));const due=open.reduce((n,b)=>n+calc(b).balance,0);$('#stats').innerHTML=`<div class="stat"><span>אירועים קרובים</span><strong>${upcoming.length}</strong></div><div class="stat"><span>הזמנות פעילות</span><strong>${open.length}</strong></div><div class="stat"><span>לקוחות</span><strong>${data.clients.length}</strong></div><div class="stat"><span>יתרות פתוחות</span><strong>${money(due)}</strong></div>`;renderList();if(activeView==='clients')renderClients()}
 function renderList(){const q=$('#searchInput').value.trim().toLowerCase(),sf=$('#statusFilter').value;const items=data.bookings.filter(b=>(!q||b.clientName.toLowerCase().includes(q)||b.phone.replace(/\D/g,'').includes(q.replace(/\D/g,'')))&&(!sf||b.status===sf)).sort((a,b)=>`${a.eventDate}${a.eventTime}`.localeCompare(`${b.eventDate}${b.eventTime}`));$('#emptyState').hidden=items.length>0;$('#bookingList').innerHTML=items.map(b=>{const d=new Date(`${b.eventDate}T12:00:00`),c=calc(b);return `<article class="booking" data-id="${b.id}" tabindex="0"><div class="datebox"><strong>${d.getDate()}</strong><span>${d.toLocaleDateString('he-IL',{month:'short'})}</span></div><div class="meta"><strong>${esc(b.clientName)}</strong><small>${esc(b.phone)} · ${esc(b.location||'ללא מיקום')}</small></div><div class="service">${esc(b.service)}</div><div class="money">${money(c.balance)}<small> יתרה</small></div><span class="badge ${b.status==='הושלמה'?'done':''}">${esc(b.status)}</span></article>`}).join('')}
