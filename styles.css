@@ -28,3 +28,6 @@ html.pre-idle-lock:not(.auth-ready) body>dialog{visibility:hidden!important}
 .client-row button{white-space:nowrap}.client-row button:disabled{opacity:.55;cursor:default}.client-muted{color:var(--muted);font-size:.88rem;line-height:1.7}
 .client-consent{display:flex!important;align-items:center;gap:9px}.client-consent input{width:auto!important;accent-color:var(--brand)}
 @media(max-width:620px){.clients-hero{align-items:flex-start;flex-direction:column}.client-panel{padding:14px}.client-row{align-items:flex-start}.client-row button{white-space:normal}.client-stats>div{padding:12px}}
+
+/* Navigation accessibility: larger labels and tap targets on iPhone. */
+@media(max-width:760px){.bottom-nav{min-height:76px;align-items:stretch}.bottom-nav button{font-size:1.35rem;min-width:64px;min-height:56px;padding:5px 7px;border-radius:12px}.bottom-nav span{font-size:.91rem;font-weight:700}.client-row small,.client-muted,.clients-hero span{font-size:1rem}.client-row strong{font-size:1.1rem}.client-panel .section-head p{font-size:1rem}}
