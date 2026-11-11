@@ -25,6 +25,7 @@
   </header>
 
   <main>
+    <div id="bookingsView">
     <section class="hero">
       <div><p id="todayLabel"></p><h1>בוקר טוב, איילת</h1></div>
       <button class="primary" id="newBookingBtn">＋ הזמנה חדשה</button>
@@ -42,6 +43,13 @@
       <div id="bookingList" class="booking-list"></div>
       <div id="emptyState" class="empty" hidden><strong>עדיין אין הזמנות</strong><span>הוסיפי הזמנה ראשונה כדי להתחיל</span></div>
     </section>
+    </div>
+    <section id="clientsView" hidden>
+      <div class="clients-hero"><div><p>AYELET MILLER · קשרי לקוחות</p><h1>🌸 הלקוחות שלי</h1><span>מקום קטן לכל לקוחה, עם יחס אישי</span></div><button id="newClientBtn" class="primary">＋ לקוחה חדשה</button></div>
+      <div class="client-stats"><div><small>לקוחות במאגר</small><strong id="clientCount">0</strong></div><div><small>ימי הולדת קרובים</small><strong id="birthdayCount">0</strong></div></div>
+      <section class="panel client-panel"><div class="section-head"><div><h2>🎂 ימי הולדת קרובים</h2><p>ברכות מוכנות לשליחה אישית ב-WhatsApp</p></div><button id="birthdaySettingsBtn" class="secondary">עריכת ברכה והטבה</button></div><div id="birthdayList"></div></section>
+      <section class="panel client-panel"><div class="section-head"><div><h2>מאגר לקוחות</h2><p>פרטי קשר והיסטוריית הזמנות</p></div></div><label class="search client-search">⌕ <input id="clientSearch" type="search" placeholder="חיפוש לפי שם או טלפון"></label><div id="clientList"></div></section>
+    </section>
   </main>
 
   <nav class="bottom-nav" aria-label="ניווט ראשי">
@@ -51,8 +59,29 @@
     <button id="priceListBtn">₪<span>מחירון</span></button>
   </nav>
 
+  <dialog id="clientDialog">
+    <form id="clientForm" class="client-form">
+      <div class="dialog-head"><div><p class="eyebrow">כרטיס לקוחה</p><h2 id="clientDialogTitle">לקוחה חדשה</h2></div><button type="button" class="close" data-close>×</button></div>
+      <input type="hidden" name="id">
+      <div class="form-grid">
+        <label>שם פרטי ומשפחה *<input name="fullName" required autocomplete="name"></label>
+        <label>טלפון נייד *<input name="phone" required type="tel" inputmode="tel" autocomplete="tel" placeholder="050-1234567"></label>
+        <label class="wide">דוא״ל<input name="email" type="email" autocomplete="email" inputmode="email"></label>
+        <label>יום הולדת (חודש-יום)<input name="birthday" type="text" inputmode="numeric" placeholder="11-27" pattern="(0[1-9]|1[0-2])-(0[1-9]|[12][0-9]|3[01])"></label>
+        <label>סוג לקוחה<select name="type"><option value="">לא נבחר</option><option>כלה</option><option>איפור ערב</option><option>אירוע</option><option>אחרת</option></select></label>
+        <label>עיר<input name="city" autocomplete="address-level2"></label>
+        <label>רחוב<input name="street" autocomplete="address-line1"></label>
+        <label>מספר בית<input name="houseNumber"></label>
+        <label>דירה<input name="apartment"></label>
+        <label class="wide">הערות שירות<textarea name="notes" rows="3"></textarea></label>
+        <label class="wide client-consent"><input name="marketingConsent" type="checkbox"> הלקוחה אישרה קבלת ברכות והצעות שיווקיות ב-WhatsApp</label>
+      </div>
+      <p id="clientHistory" class="client-muted"></p>
+      <div class="dialog-actions"><button type="button" class="secondary" data-close>ביטול</button><button class="primary" type="submit">שמירת לקוחה</button></div>
+    </form>
+  </dialog>
   <dialog id="bookingDialog">
-    <form id="bookingForm" method="dialog">
+    <form id="bookingForm">
       <div class="dialog-head"><div><p class="eyebrow">פרטי השירות</p><h2 id="dialogTitle">הזמנה חדשה</h2></div><button type="button" class="close" data-close>×</button></div>
       <input type="hidden" name="id">
       <div class="form-grid">
@@ -127,6 +156,6 @@
   <div id="toast" role="status" aria-live="polite"></div>
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.105.0"></script>
   <script src="html2pdf.bundle.min.js"></script>
-  <script src="app.js?v=20261107-session-unlock-3"></script>
+  <script src="app.js?v=20261111-client-crm-2"></script>
 </body>
 </html>
