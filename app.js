@@ -281,22 +281,22 @@ function renderClients(){
 }
 function openClient(id){
   ensureClients();const c=data.clients.find(x=>x.id===id),f=$('#clientForm');f.reset();
-  for(const k of ['id','fullName','phone','email','birthday','city','street','houseNumber','apartment','type','notes'])if(f.elements[k])f.elements[k].value=c?.[k]||'';
-  f.elements.marketingConsent.checked=!!c?.marketingConsent;
+  for(const k of ['id','fullName','phone','email','city','street','houseNumber','apartment','notes'])if(f.elements[k])f.elements[k].value=c?.[k]||'';
+  const parts=(c?.birthday||'').split('-');f.elements.birthMonth.value=parts[0]||'';f.elements.birthDay.value=parts[1]||'';const selected=c?.services|| (c?.type?[c.type]:[]);f.querySelectorAll('[name="services"]').forEach(el=>el.checked=selected.includes(el.value));f.elements.marketingConsent.checked=!!c?.marketingConsent;
   $('#clientDialogTitle').textContent=c?'עריכת לקוחה':'לקוחה חדשה';
   $('#clientHistory').textContent=c?'הזמנות קודמות: '+data.bookings.filter(b=>b.clientId===c.id).map(b=>b.eventDate+' · '+b.service).join(' | '):'';
   $('#clientDialog').showModal();
 }
 function submitClient(e){
-  e.preventDefault();const f=e.currentTarget,o=Object.fromEntries(new FormData(f)),id=o.id,phone=normalizePhone(o.phone);
-  if(!phone){toast('יש להזין מספר נייד ישראלי תקין');return}
+  e.preventDefault();const f=e.currentTarget,o=Object.fromEntries(new FormData(f)),id=o.id,phone=normalizePhone(o.phone);o.services=Array.from(f.querySelectorAll('[name="services"]:checked'),el=>el.value);o.birthday=o.birthMonth&&o.birthDay?o.birthMonth+'-'+o.birthDay:'';delete o.birthMonth;delete o.birthDay;delete o.type;
+  if(!phone){const el=f.elements.phone;el.setCustomValidity('יש להזין מספר נייד ישראלי תקין בן 10 ספרות');el.reportValidity();el.focus();return}
   o.fullName=o.fullName.trim().replace(/\s+/g,' ');
   if(o.fullName.split(' ').length<2){toast('יש להזין שם פרטי ושם משפחה');return}
   const duplicatePhone=data.clients.find(c=>c.id!==id&&normalizePhone(c.phone)===phone);
   if(duplicatePhone){toast('הטלפון כבר שייך ללקוחה '+duplicatePhone.fullName);return}
   const sameName=data.clients.find(c=>c.id!==id&&normalizeName(c.fullName)===normalizeName(o.fullName));
   if(sameName&&!confirm('כבר קיימת לקוחה בשם '+sameName.fullName+'. האם מדובר בלקוחה אחרת?'))return;
-  if(o.birthday){const [m,d]=o.birthday.split('-').map(Number),v=new Date(2024,m-1,d);if(v.getMonth()!==m-1||v.getDate()!==d){toast('תאריך יום ההולדת אינו תקין');return}}
+  if((f.elements.birthMonth.value&&!f.elements.birthDay.value)||(!f.elements.birthMonth.value&&f.elements.birthDay.value)){toast('יש לבחור גם יום וגם חודש ליום ההולדת');return}if(o.birthday){const [m,d]=o.birthday.split('-').map(Number),v=new Date(2024,m-1,d);if(v.getMonth()!==m-1||v.getDate()!==d){toast('תאריך יום ההולדת אינו תקין');return}}
   o.phone=phone;o.email=o.email.trim().toLowerCase();o.marketingConsent=f.elements.marketingConsent.checked;
   const old=data.clients.find(c=>c.id===id);
   const c={...old,...o,id:id||crypto.randomUUID(),createdAt:old?.createdAt||new Date().toISOString(),updatedAt:new Date().toISOString()};
@@ -527,3 +527,6 @@ $('#loginForm').addEventListener('submit',async e=>{
   }finally{if(button){button.disabled=false;button.textContent='שליחת קישור כניסה למייל'}}
 });
 initCloud();
+
+// Immediate, accessible validation for customer phone numbers.
+document.getElementById('clientForm')?.elements.phone?.addEventListener('input',function(){const val=this.value.trim(),valid=!val||!!normalizePhone(val);this.setCustomValidity(valid?'':'יש להזין מספר נייד ישראלי תקין, למשל 050-1234567');const hint=document.getElementById('clientPhoneError');if(hint)hint.textContent=valid?'':'מספר לא תקין: יש להזין 10 ספרות, החל ב־05';});
