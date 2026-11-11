@@ -7,7 +7,7 @@
   <meta name="description" content="ניהול לקוחות, הזמנות והסכמים — AYELET MILLER">
   <title>AYELET MILLER — ניהול לקוחות והזמנות</title>
   <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='15' fill='%2387163C'/%3E%3Cpath d='M17 47 32 14l15 33M23 35h18' fill='none' stroke='white' stroke-width='5'/%3E%3C/svg%3E" type="image/svg+xml">
-  <link rel="stylesheet" href="styles.css?v=20261111-client-actions-3">
+  <link rel="stylesheet" href="styles.css?v=20261112-sync-feedback-2">
   <link rel="stylesheet" href="agreement.css?v=20261026-3">
 <script>
   // Hide cached customer data while session and inactivity status are being checked.
@@ -76,7 +76,7 @@
         <label class="wide">הערות שירות<textarea name="notes" rows="3"></textarea></label>
         <label class="wide client-consent"><input name="marketingConsent" type="checkbox"> הלקוחה אישרה קבלת ברכות והצעות שיווקיות ב-WhatsApp</label>
       </div>
-      <p id="clientHistory" class="client-muted"></p>
+      <p id="clientHistory" class="client-muted"></p><p class="dialog-feedback" role="alert" aria-live="assertive"></p>
       <div class="dialog-actions"><button type="button" class="secondary" data-close>סגירה ללא שמירה</button><button class="primary" type="submit">שמירה וסגירה</button></div>
     </form>
   </dialog>
@@ -156,6 +156,6 @@
   <div id="toast" role="status" aria-live="polite"></div>
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.105.0"></script>
   <script src="html2pdf.bundle.min.js"></script>
-  <script src="app.js?v=20261112-delete-all-bookings-1"></script>
+  <script src="app.js?v=20261112-sync-feedback-2"></script>
 </body>
 </html>
