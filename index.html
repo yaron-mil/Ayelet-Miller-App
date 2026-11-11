@@ -108,7 +108,7 @@
         <label class="wide">הערות פנימיות <small>לא יופיעו בהסכם</small><textarea name="internalNotes" rows="2"></textarea></label>
       </div>
       <div class="totals" id="liveTotals"></div>
-      <div class="dialog-actions"><button type="button" class="secondary" data-close>ביטול</button><button type="submit" class="primary">שמירת הזמנה</button></div>
+      <div class="dialog-actions booking-form-actions"><button type="button" id="deleteBookingFromForm" class="secondary danger-action" hidden>🗑 מחיקת הזמנה</button><button type="button" class="secondary" data-close>ביטול</button><button type="submit" class="primary">שמירת הזמנה</button></div>
     </form>
   </dialog>
 
@@ -156,6 +156,6 @@
   <div id="toast" role="status" aria-live="polite"></div>
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.105.0"></script>
   <script src="html2pdf.bundle.min.js"></script>
-  <script src="app.js?v=20261111-client-actions-3"></script>
+  <script src="app.js?v=20261112-delete-all-bookings-1"></script>
 </body>
 </html>
