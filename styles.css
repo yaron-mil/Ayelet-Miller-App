@@ -37,3 +37,5 @@ html.pre-idle-lock:not(.auth-ready) body>dialog{visibility:hidden!important}
 
 /* Client dialog dismissal and deliberate destructive booking action */
 .client-close{font-size:1.4rem;min-width:44px;min-height:44px;border:1px solid #e6d6db;border-radius:50%;background:#fff4f7;color:#81133c;cursor:pointer}.danger-action{color:#a71935!important;border-color:#db9bac!important;background:#fff5f6!important}
+
+.dialog-feedback{position:sticky;bottom:0;z-index:2;background:#fff1f4;color:#87163c;border-radius:10px;padding:10px 12px;font-weight:700;display:none}.dialog-feedback.show{display:block}#toast{bottom:max(92px,calc(env(safe-area-inset-bottom) + 82px));z-index:99999;max-width:calc(100vw - 32px);white-space:normal;text-align:center;line-height:1.45}
