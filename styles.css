@@ -11,3 +11,20 @@ html.pre-idle-lock:not(.auth-ready) body>dialog{visibility:hidden!important}
 .idle-lock-card h2{color:#87163C}
 .idle-lock-card p{color:#766d71;line-height:1.6;margin:0}
 .idle-lock-card button{width:100%}
+
+
+/* Customer CRM: a gentle accent within Ayelet's existing burgundy palette */
+[hidden]{display:none!important}
+.bottom-nav [data-view="clients"]{color:var(--brand);background:#f9e9ee;border-radius:14px}
+.bottom-nav [data-view="clients"].active{background:#f2d8e1}
+.clients-hero{background:linear-gradient(115deg,#fff7f9,#f5e1e8);border:1px solid #ead0da;border-radius:20px;padding:22px;display:flex;justify-content:space-between;align-items:center;gap:12px;margin-bottom:18px}
+.clients-hero p{color:var(--brand);font-size:.78rem;letter-spacing:.05em;margin:0 0 7px}.clients-hero h1{color:var(--brand);margin:0 0 6px}.clients-hero span{color:var(--muted)}
+.client-stats{display:grid;grid-template-columns:repeat(2,1fr);gap:12px;margin-bottom:18px}
+.client-stats>div{background:white;border:1px solid var(--line);border-radius:16px;padding:18px}
+.client-stats small,.client-stats strong{display:block}.client-stats small{color:var(--muted)}.client-stats strong{font-size:1.65rem;color:var(--brand);margin-top:6px}
+.client-panel{margin-bottom:18px;padding:20px}.client-panel .section-head{display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap;margin-bottom:15px}
+.client-search{margin-bottom:14px}.client-row{display:flex;justify-content:space-between;align-items:center;gap:12px;border-top:1px solid var(--line);padding:14px 0}
+.client-row strong,.client-row small{display:block}.client-row strong{color:var(--brand)}.client-row small{color:var(--muted);margin-top:5px;line-height:1.5}
+.client-row button{white-space:nowrap}.client-row button:disabled{opacity:.55;cursor:default}.client-muted{color:var(--muted);font-size:.88rem;line-height:1.7}
+.client-consent{display:flex!important;align-items:center;gap:9px}.client-consent input{width:auto!important;accent-color:var(--brand)}
+@media(max-width:620px){.clients-hero{align-items:flex-start;flex-direction:column}.client-panel{padding:14px}.client-row{align-items:flex-start}.client-row button{white-space:normal}.client-stats>div{padding:12px}}
