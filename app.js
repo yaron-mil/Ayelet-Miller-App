@@ -7,29 +7,73 @@ let cloud=null,cloudSession=null,syncTimer=null;
 const $=s=>document.querySelector(s), money=n=>new Intl.NumberFormat('he-IL',{style:'currency',currency:'ILS',maximumFractionDigits:0}).format(Number(n)||0);
 const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 function load(){try{return {...structuredClone(seed),...JSON.parse(localStorage.getItem(STORE)||'{}')}}catch{return structuredClone(seed)}}
-let localRevision=0,cloudWriteQueue=Promise.resolve(),pendingCloudWrite=false;
-function save(action='עדכון נתונים'){data.history.unshift({id:crypto.randomUUID(),at:new Date().toISOString(),action});data.history=data.history.slice(0,250);localRevision++;pendingCloudWrite=true;localStorage.setItem(STORE,JSON.stringify(data));render();return syncCloud()}
+// Persist a small operation journal so an older device cannot overwrite newer cloud data.
+const PENDING_KEY=STORE+'-pending-operations-v2';
+let pendingOps=[];try{pendingOps=JSON.parse(localStorage.getItem(PENDING_KEY)||'[]');if(!Array.isArray(pendingOps))pendingOps=[]}catch{pendingOps=[]}
+let cloudWriteQueue=Promise.resolve(),syncInProgress=false;
+function queueOperation(kind,id,value){
+  pendingOps.push({kind,id,value:value?structuredClone(value):null,at:new Date().toISOString(),opId:crypto.randomUUID()});
+  localStorage.setItem(PENDING_KEY,JSON.stringify(pendingOps));
+}
+function mergeOperations(remote,ops){
+  const merged={...structuredClone(seed),...structuredClone(remote||{})};
+  for(const op of ops){
+    if(op.kind==='client-upsert'){merged.clients=Array.isArray(merged.clients)?merged.clients:[];const i=merged.clients.findIndex(x=>x.id===op.id);if(i<0)merged.clients.push(op.value);else merged.clients[i]=op.value}
+    if(op.kind==='booking-upsert'){merged.bookings=Array.isArray(merged.bookings)?merged.bookings:[];const i=merged.bookings.findIndex(x=>x.id===op.id);if(i<0)merged.bookings.push(op.value);else merged.bookings[i]=op.value}
+    if(op.kind==='booking-delete'){merged.bookings=(merged.bookings||[]).filter(x=>x.id!==op.id);merged.deletedBookingIds={...(merged.deletedBookingIds||{}),[op.id]:op.at}}
+    if(op.kind==='state-update'){merged[op.id]=op.value}
+  }
+  const deleted=merged.deletedBookingIds||{};
+  merged.bookings=(merged.bookings||[]).filter(x=>!deleted[x.id]);
+  return merged;
+}
+function showSaveStatus(message,failed=false){
+  const el=$('#clientSaveStatus');if(el){el.hidden=false;el.textContent=message;el.classList.toggle('save-failed',failed)}
+  toast(message)
+}
+function save(action='עדכון נתונים'){
+  data.history.unshift({id:crypto.randomUUID(),at:new Date().toISOString(),action});
+  data.history=data.history.slice(0,250);
+  localStorage.setItem(STORE,JSON.stringify(data));
+  render();
+  return syncCloud()
+}
 function syncCloud(){
-  if(!cloudSession||!cloud){toast('נשמר במכשיר בלבד — אין חיבור לענן');return Promise.resolve(false)}
-  const snapshot=structuredClone(data),revision=localRevision;
+  if(!cloudSession||!cloud){showSaveStatus('נשמר במכשיר בלבד. אין חיבור לענן — לא ניתן לאשר שמירה משותפת.',true);return Promise.resolve(false)}
   cloudWriteQueue=cloudWriteQueue.catch(()=>false).then(async()=>{
+    if(!pendingOps.length)return true;
     try{
-      const {error}=await cloud.from('app_state').upsert({workspace_id:'main',user_id:cloudSession.user.id,payload:snapshot,updated_at:new Date().toISOString()},{onConflict:'workspace_id'});
-      if(error)throw error;
-      if(revision===localRevision)pendingCloudWrite=false;
-      toast('השינויים נשמרו בענן בהצלחה');
+      const {data:row,error:readError}=await cloud.from('app_state').select('payload').eq('workspace_id','main').maybeSingle();
+      if(readError)throw readError;
+      const batch=pendingOps.slice(),merged=mergeOperations(row?.payload||data,batch);
+      const {error:writeError}=await cloud.from('app_state').upsert({workspace_id:'main',user_id:cloudSession.user.id,payload:merged,updated_at:new Date().toISOString()},{onConflict:'workspace_id'});
+      if(writeError)throw writeError;
+      const done=new Set(batch.map(x=>x.opId));
+      pendingOps=pendingOps.filter(x=>!done.has(x.opId));
+      localStorage.setItem(PENDING_KEY,JSON.stringify(pendingOps));
+      // Do not replace data while there are newer local edits.
+      if(!pendingOps.length){data=merged;localStorage.setItem(STORE,JSON.stringify(data));render()}
+      showSaveStatus('✓ השינויים נשמרו בענן בהצלחה');
       return true;
-    }catch(error){console.error('Cloud save failed',error);toast('שגיאה בשמירה בענן — הנתונים נשמרו במכשיר בלבד');return false}
+    }catch(error){console.error('Cloud sync failed',error);showSaveStatus('השמירה בענן נכשלה. הנתונים נשמרו במכשיר ויישלחו שוב בחיבור הבא.',true);return false}
   });
   return cloudWriteQueue;
 }
 async function loadCloud(){
-  const revisionAtStart=localRevision;
-  const {data:row,error}=await cloud.from('app_state').select('payload').eq('workspace_id','main').maybeSingle();
-  if(error){toast('הגישה למאגר לא אושרה');return}
-  if(revisionAtStart!==localRevision||pendingCloudWrite){console.warn('Cloud load skipped to protect unsynced local edits');return}
-  if(row?.payload){data={...structuredClone(seed),...row.payload};localStorage.setItem(STORE,JSON.stringify(data));render();toast('הנתונים סונכרנו')}
-  else syncCloud()
+  try{
+    const {data:row,error}=await cloud.from('app_state').select('payload').eq('workspace_id','main').maybeSingle();
+    if(error)throw error;
+    if(row?.payload){
+      // Recover clients that exist only on this device; never resurrect locally stale bookings.
+      const remote=row.payload,remoteIds=new Set((remote.clients||[]).map(c=>c.id));
+      const localOnly=(data.clients||[]).filter(c=>c.id&&!remoteIds.has(c.id));
+      for(const c of localOnly){if(!pendingOps.some(op=>op.kind==='client-upsert'&&op.id===c.id))queueOperation('client-upsert',c.id,c)}
+      data=mergeOperations(remote,pendingOps);
+      localStorage.setItem(STORE,JSON.stringify(data));render();
+    }
+    if(pendingOps.length)await syncCloud();
+    else toast('הנתונים נטענו מהענן');
+  }catch(error){console.error('Cloud load failed',error);showSaveStatus('לא ניתן לטעון נתונים מהענן. השינויים המקומיים נשמרו.',true)}
 }
 async function initCloud(){
   if(['127.0.0.1','localhost'].includes(location.hostname)){document.documentElement.classList.add('auth-ready');return}
@@ -321,9 +365,9 @@ async function submitClient(e){
   o.phone=phone;o.email=o.email.trim().toLowerCase();o.marketingConsent=f.elements.marketingConsent.checked;
   const old=data.clients.find(c=>c.id===id);
   const c={...old,...o,id:id||crypto.randomUUID(),createdAt:old?.createdAt||new Date().toISOString(),updatedAt:new Date().toISOString()};
-  if(old)Object.assign(old,c);else data.clients.push(c);
+  if(old)Object.assign(old,c);else data.clients.push(c);queueOperation('client-upsert',c.id,c);
   if(old)for(const b of data.bookings.filter(b=>b.clientId===id)){b.clientName=c.fullName;b.phone=c.phone;b.email=c.email}
-  $('#clientDialog').close();$('#clientSearch').value='';setView('clients');toast('הלקוחה נשמרה במכשיר, מעדכנים את הענן...');await save('עודכן כרטיס לקוחה: '+c.fullName);
+  $('#clientDialog').close();$('#clientSearch').value='';setView('clients');showSaveStatus('שומר את הלקוחה '+c.fullName+' בענן...');await save('עודכן כרטיס לקוחה: '+c.fullName);
 }
 function syncBookingClient(obj){
   ensureClients();const phone=normalizePhone(obj.phone);
@@ -374,7 +418,7 @@ function services(){const s=$('#serviceSelect');s.innerHTML=data.prices.map(p=>`
 function toggleOtherService(){const f=$('#bookingForm'),isOther=f.elements.serviceSelection.value==='אחר',field=$('#otherServiceField'),input=$('#serviceOtherInput');field.hidden=!isOther;input.required=isOther;if(!isOther)input.value=''}
 function openBooking(b){services();const f=$('#bookingForm');f.reset();f.elements.id.value=b?.id||'';f.elements.makeupCount.value=b?.makeupCount||1;$('#dialogTitle').textContent=b?'עריכת הזמנה':'הזמנה חדשה';if(b){Object.entries(b).forEach(([k,v])=>{if(f.elements[k]&&!['serviceSelection','serviceOther'].includes(k))f.elements[k].value=v});const known=data.prices.some(p=>p.name===b.service)&&b.serviceIsOther!=='true';f.elements.serviceSelection.value=known?b.service:'אחר';f.elements.serviceOther.value=known?'':b.service}else{f.elements.eventDate.value=new Date().toISOString().slice(0,10);const p=data.prices[0];if(p){f.elements.serviceSelection.value=p.name;f.elements.servicePrice.value=p.price}}toggleOtherService();updateTotals();const deleteBtn=$('#deleteBookingFromForm');deleteBtn.hidden=!b?.id;deleteBtn.onclick=()=>{if(!b?.id)return;deleteBooking(b.id)};$('#bookingDialog').showModal()}
 function updateTotals(){const f=$('#bookingForm'),c=calc({servicePrice:f.elements.servicePrice.value,travelPrice:f.elements.travelPrice.value,depositAmount:f.elements.depositAmount.value,depositStatus:f.elements.depositStatus.value});$('#liveTotals').innerHTML=`<span>סה״כ<strong>${money(c.total)}</strong></span><span>שולם<strong>${money(c.paid)}</strong></span><span>יתרה לתשלום<strong>${money(c.balance)}</strong></span>`}
-function submitBooking(event){event.preventDefault();const f=$('#bookingForm'),obj=Object.fromEntries(new FormData(f)),isOther=obj.serviceSelection==='אחר';obj.service=isOther?obj.serviceOther.trim():obj.serviceSelection;obj.serviceIsOther=String(isOther);delete obj.serviceSelection;delete obj.serviceOther;if(!obj.service){toast('יש לציין את סוג השירות');return}if(!Number.isInteger(Number(obj.makeupCount))||Number(obj.makeupCount)<1){toast('יש להזין כמות מאופרות תקינה');return}if(!syncBookingClient(obj))return;obj.id=obj.id||crypto.randomUUID();obj.updatedAt=new Date().toISOString();const i=data.bookings.findIndex(x=>x.id===obj.id);if(i>=0)data.bookings[i]={...data.bookings[i],...obj};else{obj.createdAt=obj.updatedAt;data.bookings.push(obj)}$('#bookingDialog').close();save(`${i>=0?'עודכנה':'נוצרה'} הזמנה עבור ${obj.clientName}`);toast('ההזמנה נשמרה')}
+function submitBooking(event){event.preventDefault();const f=$('#bookingForm'),obj=Object.fromEntries(new FormData(f)),isOther=obj.serviceSelection==='אחר';obj.service=isOther?obj.serviceOther.trim():obj.serviceSelection;obj.serviceIsOther=String(isOther);delete obj.serviceSelection;delete obj.serviceOther;if(!obj.service){toast('יש לציין את סוג השירות');return}if(!Number.isInteger(Number(obj.makeupCount))||Number(obj.makeupCount)<1){toast('יש להזין כמות מאופרות תקינה');return}if(!syncBookingClient(obj))return;obj.id=obj.id||crypto.randomUUID();obj.updatedAt=new Date().toISOString();const i=data.bookings.findIndex(x=>x.id===obj.id);if(i>=0)data.bookings[i]={...data.bookings[i],...obj};else{obj.createdAt=obj.updatedAt;data.bookings.push(obj)}queueOperation('booking-upsert',obj.id,data.bookings.find(x=>x.id===obj.id));$('#bookingDialog').close();save(`${i>=0?'עודכנה':'נוצרה'} הזמנה עבור ${obj.clientName}`);toast('ההזמנה נשמרה')}
 const dateHe=value=>value?new Date(`${value}T12:00:00`).toLocaleDateString('he-IL'):'לא נקבע';
 const safeFileName=value=>String(value||'לקוחה').trim().replace(/[\\/:*?"<>|]+/g,'-').replace(/\s+/g,'-');
 function agreementHtml(b){const c=calc(b),created=dateHe((b.createdAt||'').slice(0,10));return `<section class="agreement" id="agreement-${b.id}" dir="rtl">
@@ -505,7 +549,7 @@ window.shareAgreementWhatsApp=shareAgreementWhatsApp;
 window.downloadAgreement=downloadAgreement;
 window.shareAgreement=shareAgreement;
 function detail(id){const b=data.bookings.find(x=>x.id===id);if(!b)return;const phone=b.phone.replace(/\D/g,'').replace(/^0/,'972'),hist=data.history.filter(h=>h.action.includes(b.clientName)).slice(0,8);$('#detailsContent').innerHTML=`<div class="dialog-head"><div><p class="eyebrow">${esc(b.status)}</p><h2>${esc(b.clientName)} · ${dateHe(b.eventDate)}</h2></div><button class="close" onclick="detailsDialog.close()">×</button></div><div class="detail-actions"><button class="primary" onclick="downloadAgreement('${b.id}')">הסכם להורדה כ-PDF</button><button class="secondary" onclick="shareAgreement('${b.id}')">שיתוף ההסכם</button><button class="secondary" onclick="downloadAgreement('${b.id}')">הדפסה</button><button class="secondary" onclick="editBooking('${b.id}')">עריכה</button><button class="secondary" onclick="duplicateBooking('${b.id}')">שכפול</button><button class="secondary danger-action" onclick="deleteBooking('${b.id}')">מחיקת הזמנה</button><button class="secondary" onclick="shareAgreementWhatsApp('${b.id}')">הסכם לשיתוף ב-WhatsApp</button></div>${agreementHtml(b)}${b.internalNotes?`<aside class="internal-note"><strong>הערה פנימית - אינה מופיעה בקובץ:</strong><br>${esc(b.internalNotes).replace(/\n/g,'<br>')}</aside>`:''}<h3>היסטוריית שינויים</h3><div class="timeline">${hist.map(h=>`<div><strong>${esc(h.action)}</strong><small> · ${new Date(h.at).toLocaleString('he-IL')}</small></div>`).join('')||'אין שינויים קודמים'}</div>`;$('#detailsDialog').showModal()}
-window.deleteBooking=id=>{const b=data.bookings.find(x=>x.id===id);if(!b)return;if(!confirm('למחוק לצמיתות את ההזמנה של '+b.clientName+' מתאריך '+dateHe(b.eventDate)+'?\\nכרטיס הלקוחה יישמר במאגר.'))return;data.bookings=data.bookings.filter(x=>x.id!==id);$('#detailsDialog').close();if($('#bookingDialog').open)$('#bookingDialog').close();save('נמחקה הזמנה עבור '+b.clientName+' בתאריך '+dateHe(b.eventDate));toast('ההזמנה נמחקה. הלקוחה נשארה במאגר')};
+window.deleteBooking=id=>{const b=data.bookings.find(x=>x.id===id);if(!b)return;if(!confirm('למחוק לצמיתות את ההזמנה של '+b.clientName+' מתאריך '+dateHe(b.eventDate)+'?\\nכרטיס הלקוחה יישמר במאגר.'))return;data.bookings=data.bookings.filter(x=>x.id!==id);queueOperation('booking-delete',id);$('#detailsDialog').close();if($('#bookingDialog').open)$('#bookingDialog').close();save('נמחקה הזמנה עבור '+b.clientName+' בתאריך '+dateHe(b.eventDate));toast('ההזמנה נמחקה. הלקוחה נשארה במאגר')};
 window.editBooking=id=>{$('#detailsDialog').close();openBooking(data.bookings.find(b=>b.id===id))};
 window.duplicateBooking=id=>{const source=data.bookings.find(x=>x.id===id),b={...source,id:'',status:'טיוטה',clientName:source.clientName+' — עותק'};$('#detailsDialog').close();openBooking(b)};
 function priceList(){$('#priceContent').innerHTML=`<div class="dialog-head"><div><p class="eyebrow">הגדרות</p><h2>מחירון</h2></div><button class="close" onclick="priceDialog.close()">×</button></div><div id="prices">${data.prices.map(p=>`<div class="price-row"><input value="${esc(p.name)}" data-id="${p.id}" data-k="name"><input type="number" value="${p.price}" data-id="${p.id}" data-k="price"><button class="secondary" data-del="${p.id}">מחיקה</button></div>`).join('')}</div><div class="dialog-actions"><button class="secondary" id="addPrice">הוספת שירות</button><button class="primary" id="savePrices">שמירה</button></div>`;$('#priceDialog').showModal();$('#addPrice').onclick=()=>{data.prices.push({id:crypto.randomUUID(),name:'שירות חדש',price:0});priceList()};$('#prices').onclick=e=>{if(e.target.dataset.del){data.prices=data.prices.filter(p=>p.id!==e.target.dataset.del);priceList()}};$('#savePrices').onclick=()=>{$('#prices').querySelectorAll('input').forEach(i=>{const p=data.prices.find(x=>x.id===i.dataset.id);p[i.dataset.k]=i.dataset.k==='price'?Number(i.value):i.value});save('המחירון עודכן');$('#priceDialog').close();toast('המחירון נשמר')}}
