@@ -10,7 +10,7 @@ function load(){try{return {...structuredClone(seed),...JSON.parse(localStorage.
 // Persist a small operation journal so an older device cannot overwrite newer cloud data.
 const PENDING_KEY=STORE+'-pending-operations-v2';
 let pendingOps=[];try{pendingOps=JSON.parse(localStorage.getItem(PENDING_KEY)||'[]');if(!Array.isArray(pendingOps))pendingOps=[]}catch{pendingOps=[]}
-let cloudWriteQueue=Promise.resolve(),syncInProgress=false;
+let cloudWriteQueue=Promise.resolve(),lastSavedSnapshot=structuredClone(data);
 function queueOperation(kind,id,value){
   pendingOps.push({kind,id,value:value?structuredClone(value):null,at:new Date().toISOString(),opId:crypto.randomUUID()});
   localStorage.setItem(PENDING_KEY,JSON.stringify(pendingOps));
@@ -32,6 +32,17 @@ function showSaveStatus(message,failed=false){
   toast(message)
 }
 function save(action='עדכון נתונים'){
+  for(const collection of ['clients','bookings']){
+    const before=new Map((lastSavedSnapshot[collection]||[]).map(x=>[x.id,x]));
+    const after=new Map((data[collection]||[]).map(x=>[x.id,x]));
+    for(const [id,value] of after)if(JSON.stringify(before.get(id))!==JSON.stringify(value)){
+      const kind=collection==='clients'?'client-upsert':'booking-upsert';
+      if(!pendingOps.some(op=>op.kind===kind&&op.id===id&&JSON.stringify(op.value)===JSON.stringify(value)))queueOperation(kind,id,value);
+    }
+    if(collection==='bookings')for(const id of before.keys())if(!after.has(id)&&!pendingOps.some(op=>op.kind==='booking-delete'&&op.id===id))queueOperation('booking-delete',id);
+  }
+  for(const key of ['prices','birthdaySettings','birthdaySent'])if(JSON.stringify(lastSavedSnapshot[key])!==JSON.stringify(data[key]))queueOperation('state-update',key,data[key]);
+  lastSavedSnapshot=structuredClone(data);
   data.history.unshift({id:crypto.randomUUID(),at:new Date().toISOString(),action});
   data.history=data.history.slice(0,250);
   localStorage.setItem(STORE,JSON.stringify(data));
@@ -52,7 +63,7 @@ function syncCloud(){
       pendingOps=pendingOps.filter(x=>!done.has(x.opId));
       localStorage.setItem(PENDING_KEY,JSON.stringify(pendingOps));
       // Do not replace data while there are newer local edits.
-      if(!pendingOps.length){data=merged;localStorage.setItem(STORE,JSON.stringify(data));render()}
+      if(!pendingOps.length){data=merged;lastSavedSnapshot=structuredClone(data);localStorage.setItem(STORE,JSON.stringify(data));render()}
       showSaveStatus('✓ השינויים נשמרו בענן בהצלחה');
       return true;
     }catch(error){console.error('Cloud sync failed',error);showSaveStatus('השמירה בענן נכשלה. הנתונים נשמרו במכשיר ויישלחו שוב בחיבור הבא.',true);return false}
@@ -68,7 +79,7 @@ async function loadCloud(){
       const remote=row.payload,remoteIds=new Set((remote.clients||[]).map(c=>c.id));
       const localOnly=(data.clients||[]).filter(c=>c.id&&!remoteIds.has(c.id));
       for(const c of localOnly){if(!pendingOps.some(op=>op.kind==='client-upsert'&&op.id===c.id))queueOperation('client-upsert',c.id,c)}
-      data=mergeOperations(remote,pendingOps);
+      data=mergeOperations(remote,pendingOps);lastSavedSnapshot=structuredClone(data);
       localStorage.setItem(STORE,JSON.stringify(data));render();
     }
     if(pendingOps.length)await syncCloud();
