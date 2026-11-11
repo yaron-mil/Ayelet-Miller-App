@@ -1,7 +1,7 @@
 const STORE='ayelet-miller-v1';
 const SUPABASE_URL='https://tvoriihijpwrxdnayfdq.supabase.co';
 const SUPABASE_KEY='eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InR2b3JpaWhpanB3cnhkbmF5ZmRxIiwicm9sZSI6ImFub24iLCJpYXQiOjE3OTEyMTMwMjcsImV4cCI6MjEwNjc4OTAyN30.f-Bp99AbxVT-WYHtbaR48NvqU9mDfyOVJFRf34Ks91s';
-const seed={bookings:[],prices:[{id:'p1',name:'איפור כלה',price:1800},{id:'p2',name:'איפור ערב',price:450},{id:'p3',name:'ליווי לאירוע',price:900}],history:[]};
+const seed={clients:[],birthdaySettings:{daysAhead:7,message:'מזל טוב {name}! 🎉🎂 מאחלת לך שנה נפלאה מלאה בשמחה וביופי ❤️ לכבוד יום הולדתך מחכה לך הטבה מיוחדת ממני 💄',offer:'',terms:''},birthdaySent:{},bookings:[],prices:[{id:'p1',name:'איפור כלה',price:1800},{id:'p2',name:'איפור ערב',price:450},{id:'p3',name:'ליווי לאירוע',price:900}],history:[]};
 let data=load();
 let cloud=null,cloudSession=null,syncTimer=null;
 const $=s=>document.querySelector(s), money=n=>new Intl.NumberFormat('he-IL',{style:'currency',currency:'ILS',maximumFractionDigits:0}).format(Number(n)||0);
@@ -238,15 +238,116 @@ function togglePasswordLogin(){
   if(!f.hidden)f.elements.email.focus();
 }
 
+
+let activeView='bookings';
+const normalizeName=s=>String(s||'').trim().replace(/\\s+/g,' ').toLocaleLowerCase('he-IL');
+function normalizePhone(s){const n=String(s||'').replace(/[\\s().-]/g,'');const local=n.startsWith('+972')?'0'+n.slice(4):n.startsWith('972')?'0'+n.slice(3):n;return /^05[0-9]{8}$/.test(local)?local:null}
+function ensureClients(){
+  if(!Array.isArray(data.clients))data.clients=[];
+  if(!data.birthdaySettings)data.birthdaySettings=structuredClone(seed.birthdaySettings);
+  if(!data.birthdaySent)data.birthdaySent={};
+  for(const b of data.bookings){
+    const phone=normalizePhone(b.phone);if(!phone)continue;
+    let c=data.clients.find(x=>x.id===b.clientId)||data.clients.find(x=>normalizePhone(x.phone)===phone);
+    if(!c){c={id:crypto.randomUUID(),fullName:b.clientName||'',phone,email:b.email||'',birthday:'',city:'',street:'',houseNumber:'',apartment:'',type:'',notes:'',marketingConsent:false,createdAt:b.createdAt||new Date().toISOString()};data.clients.push(c)}
+    if(!b.clientId)b.clientId=c.id;
+  }
+}
+function birthdayDays(c){
+  if(!/^\\d{2}-\\d{2}$/.test(c.birthday||''))return null;
+  const [m,d]=c.birthday.split('-').map(Number),today=new Date();today.setHours(0,0,0,0);
+  for(let year=today.getFullYear();year<=today.getFullYear()+4;year++){
+    const next=new Date(year,m-1,d);if(next.getMonth()!==m-1||next.getDate()!==d)continue;
+    const days=Math.round((next-today)/86400000);if(days>=0)return {days,year};
+  }
+  return null;
+}
+function setView(view){
+  activeView=view;$('#bookingsView').hidden=view!=='bookings';$('#clientsView').hidden=view!=='clients';
+  document.querySelectorAll('.bottom-nav [data-view]').forEach(b=>b.classList.toggle('active',b.dataset.view===view));
+  if(view==='clients')renderClients();
+}
+function renderClients(){
+  ensureClients();const q=($('#clientSearch')?.value||'').trim().toLowerCase(),days=Number(data.birthdaySettings.daysAhead)||7;
+  const items=data.clients.filter(c=>!q||c.fullName.toLowerCase().includes(q)||c.phone.includes(q.replace(/\\D/g,'')));
+  $('#clientCount').textContent=data.clients.length;
+  const soon=data.clients.map(c=>({c,b:birthdayDays(c)})).filter(x=>x.b&&x.b.days<=days).sort((a,b)=>a.b.days-b.b.days);
+  $('#birthdayCount').textContent=soon.length;
+  $('#birthdayList').innerHTML=soon.length?soon.map(({c,b})=>{
+    const sent=!!data.birthdaySent[c.id+'-'+b.year];
+    return '<div class="client-row"><div><strong>🎂 '+esc(c.fullName)+'</strong><small>בעוד '+b.days+' ימים · '+esc(c.phone)+'</small><small>'+(c.marketingConsent?'אישרה קבלת הטבות':'לא סומנה הסכמה שיווקית')+'</small></div><button class="secondary" data-birthday="'+esc(c.id)+'" '+(!c.marketingConsent||sent?'disabled':'')+'>'+(sent?'סומנה כנשלחה':c.marketingConsent?'ברכה ב-WhatsApp':'נדרשת הסכמה')+'</button></div>'
+  }).join(''):'<p class="client-muted">אין ימי הולדת בטווח שנבחר.</p>';
+  $('#clientList').innerHTML=items.length?items.slice().sort((a,b)=>a.fullName.localeCompare(b.fullName,'he')).map(c=>'<div class="client-row"><div><strong>'+esc(c.fullName)+'</strong><small>'+esc(c.phone)+(c.email?' · '+esc(c.email):'')+'</small><small>'+data.bookings.filter(b=>b.clientId===c.id).length+' הזמנות'+(c.birthday?' · 🎂 '+esc(c.birthday):'')+'</small></div><button class="secondary" data-edit-client="'+esc(c.id)+'">פתיחה</button></div>').join(''):'<p class="client-muted">לא נמצאו לקוחות.</p>';
+}
+function openClient(id){
+  ensureClients();const c=data.clients.find(x=>x.id===id),f=$('#clientForm');f.reset();
+  for(const k of ['id','fullName','phone','email','birthday','city','street','houseNumber','apartment','type','notes'])if(f.elements[k])f.elements[k].value=c?.[k]||'';
+  f.elements.marketingConsent.checked=!!c?.marketingConsent;
+  $('#clientDialogTitle').textContent=c?'עריכת לקוחה':'לקוחה חדשה';
+  $('#clientHistory').textContent=c?'הזמנות קודמות: '+data.bookings.filter(b=>b.clientId===c.id).map(b=>b.eventDate+' · '+b.service).join(' | '):'';
+  $('#clientDialog').showModal();
+}
+function submitClient(e){
+  e.preventDefault();const f=e.currentTarget,o=Object.fromEntries(new FormData(f)),id=o.id,phone=normalizePhone(o.phone);
+  if(!phone){toast('יש להזין מספר נייד ישראלי תקין');return}
+  o.fullName=o.fullName.trim().replace(/\\s+/g,' ');
+  if(o.fullName.split(' ').length<2){toast('יש להזין שם פרטי ושם משפחה');return}
+  const duplicatePhone=data.clients.find(c=>c.id!==id&&normalizePhone(c.phone)===phone);
+  if(duplicatePhone){toast('הטלפון כבר שייך ללקוחה '+duplicatePhone.fullName);return}
+  const sameName=data.clients.find(c=>c.id!==id&&normalizeName(c.fullName)===normalizeName(o.fullName));
+  if(sameName&&!confirm('כבר קיימת לקוחה בשם '+sameName.fullName+'. האם מדובר בלקוחה אחרת?'))return;
+  if(o.birthday){const [m,d]=o.birthday.split('-').map(Number),v=new Date(2024,m-1,d);if(v.getMonth()!==m-1||v.getDate()!==d){toast('תאריך יום ההולדת אינו תקין');return}}
+  o.phone=phone;o.email=o.email.trim().toLowerCase();o.marketingConsent=f.elements.marketingConsent.checked;
+  const old=data.clients.find(c=>c.id===id);
+  const c={...old,...o,id:id||crypto.randomUUID(),createdAt:old?.createdAt||new Date().toISOString(),updatedAt:new Date().toISOString()};
+  if(old)Object.assign(old,c);else data.clients.push(c);
+  if(old)for(const b of data.bookings.filter(b=>b.clientId===id)){b.clientName=c.fullName;b.phone=c.phone;b.email=c.email}
+  $('#clientDialog').close();save('עודכן כרטיס לקוחה: '+c.fullName);
+}
+function syncBookingClient(obj){
+  ensureClients();const phone=normalizePhone(obj.phone);
+  if(!phone){toast('יש להזין מספר נייד ישראלי תקין');return false}
+  obj.phone=phone;obj.clientName=obj.clientName.trim().replace(/\\s+/g,' ');
+  if(obj.clientName.split(' ').length<2){toast('יש להזין שם פרטי ושם משפחה');return false}
+  const existing=data.clients.find(c=>normalizePhone(c.phone)===phone);
+  if(existing){
+    if(normalizeName(existing.fullName)!==normalizeName(obj.clientName)&&!confirm('הטלפון שייך ל'+existing.fullName+'. לקשר את ההזמנה ללקוחה זו?'))return false;
+    obj.clientId=existing.id;obj.clientName=existing.fullName;
+    if(obj.email&&!existing.email)existing.email=obj.email;
+  }else{
+    const same=data.clients.find(c=>normalizeName(c.fullName)===normalizeName(obj.clientName));
+    if(same&&!confirm('כבר קיימת לקוחה בשם '+same.fullName+' עם טלפון אחר. ליצור לקוחה נוספת?'))return false;
+    const c={id:crypto.randomUUID(),fullName:obj.clientName,phone,email:obj.email||'',birthday:'',marketingConsent:false,createdAt:new Date().toISOString()};
+    data.clients.push(c);obj.clientId=c.id;
+  }
+  return true;
+}
+function birthdayWhatsApp(id){
+  const c=data.clients.find(x=>x.id===id),b=c&&birthdayDays(c);if(!c||!b||!c.marketingConsent)return;
+  const settings=data.birthdaySettings;
+  const message=settings.message.replaceAll('{name}',c.fullName.split(' ')[0])+(settings.offer?'\\n\\n'+settings.offer:'')+(settings.terms?'\\n'+settings.terms:'');
+  const url='https://wa.me/972'+c.phone.slice(1)+'?text='+encodeURIComponent(message);
+  window.open(url,'_blank','noopener,noreferrer');
+  if(confirm('האם שלחת את הברכה בפועל ב-WhatsApp?')){data.birthdaySent[id+'-'+b.year]=new Date().toISOString();save('ברכת יום הולדת סומנה כנשלחה ל'+c.fullName)}
+}
+function editBirthdaySettings(){
+  const x=data.birthdaySettings;
+  const days=prompt('כמה ימים מראש להציג ימי הולדת?',String(x.daysAhead));if(days===null)return;
+  const message=prompt('נוסח ברכה. {name} יוחלף בשם הפרטי:',x.message);if(message===null)return;
+  const offer=prompt('הטבת יום הולדת (אפשר להשאיר ריק):',x.offer);if(offer===null)return;
+  const terms=prompt('תנאי ההטבה ותוקף (אפשר להשאיר ריק):',x.terms);if(terms===null)return;
+  data.birthdaySettings={daysAhead:Math.min(60,Math.max(1,Number(days)||7)),message,offer,terms};save('עודכנו הגדרות ימי הולדת');
+}
+
 function calc(b){const total=Number(b.servicePrice||0)+Number(b.travelPrice||0),paid=b.depositStatus==='שולמה'?Number(b.depositAmount||0):0;return {total,paid,balance:Math.max(0,total-paid)}}
 function toast(t){const el=$('#toast');el.textContent=t;el.classList.add('show');setTimeout(()=>el.classList.remove('show'),2200)}
-function render(){const now=new Date(),upcoming=data.bookings.filter(b=>b.status!=='בוטלה'&&new Date(`${b.eventDate}T${b.eventTime||'00:00'}`)>=new Date(now.toDateString())).sort((a,b)=>a.eventDate.localeCompare(b.eventDate));const open=data.bookings.filter(b=>!['הושלמה','בוטלה'].includes(b.status));const due=open.reduce((n,b)=>n+calc(b).balance,0);$('#stats').innerHTML=`<div class="stat"><span>אירועים קרובים</span><strong>${upcoming.length}</strong></div><div class="stat"><span>הזמנות פעילות</span><strong>${open.length}</strong></div><div class="stat"><span>לקוחות</span><strong>${new Set(data.bookings.map(b=>b.phone)).size}</strong></div><div class="stat"><span>יתרות פתוחות</span><strong>${money(due)}</strong></div>`;renderList()}
+function render(){ensureClients();const now=new Date(),upcoming=data.bookings.filter(b=>b.status!=='בוטלה'&&new Date(`${b.eventDate}T${b.eventTime||'00:00'}`)>=new Date(now.toDateString())).sort((a,b)=>a.eventDate.localeCompare(b.eventDate));const open=data.bookings.filter(b=>!['הושלמה','בוטלה'].includes(b.status));const due=open.reduce((n,b)=>n+calc(b).balance,0);$('#stats').innerHTML=`<div class="stat"><span>אירועים קרובים</span><strong>${upcoming.length}</strong></div><div class="stat"><span>הזמנות פעילות</span><strong>${open.length}</strong></div><div class="stat"><span>לקוחות</span><strong>${data.clients.length}</strong></div><div class="stat"><span>יתרות פתוחות</span><strong>${money(due)}</strong></div>`;renderList();if(activeView==='clients')renderClients()}
 function renderList(){const q=$('#searchInput').value.trim().toLowerCase(),sf=$('#statusFilter').value;const items=data.bookings.filter(b=>(!q||b.clientName.toLowerCase().includes(q)||b.phone.replace(/\D/g,'').includes(q.replace(/\D/g,'')))&&(!sf||b.status===sf)).sort((a,b)=>`${a.eventDate}${a.eventTime}`.localeCompare(`${b.eventDate}${b.eventTime}`));$('#emptyState').hidden=items.length>0;$('#bookingList').innerHTML=items.map(b=>{const d=new Date(`${b.eventDate}T12:00:00`),c=calc(b);return `<article class="booking" data-id="${b.id}" tabindex="0"><div class="datebox"><strong>${d.getDate()}</strong><span>${d.toLocaleDateString('he-IL',{month:'short'})}</span></div><div class="meta"><strong>${esc(b.clientName)}</strong><small>${esc(b.phone)} · ${esc(b.location||'ללא מיקום')}</small></div><div class="service">${esc(b.service)}</div><div class="money">${money(c.balance)}<small> יתרה</small></div><span class="badge ${b.status==='הושלמה'?'done':''}">${esc(b.status)}</span></article>`}).join('')}
 function services(){const s=$('#serviceSelect');s.innerHTML=data.prices.map(p=>`<option value="${esc(p.name)}" data-price="${p.price}">${esc(p.name)}</option>`).join('')+`<option value="אחר">אחר</option>`}
 function toggleOtherService(){const f=$('#bookingForm'),isOther=f.elements.serviceSelection.value==='אחר',field=$('#otherServiceField'),input=$('#serviceOtherInput');field.hidden=!isOther;input.required=isOther;if(!isOther)input.value=''}
 function openBooking(b){services();const f=$('#bookingForm');f.reset();f.elements.id.value=b?.id||'';f.elements.makeupCount.value=b?.makeupCount||1;$('#dialogTitle').textContent=b?'עריכת הזמנה':'הזמנה חדשה';if(b){Object.entries(b).forEach(([k,v])=>{if(f.elements[k]&&!['serviceSelection','serviceOther'].includes(k))f.elements[k].value=v});const known=data.prices.some(p=>p.name===b.service)&&b.serviceIsOther!=='true';f.elements.serviceSelection.value=known?b.service:'אחר';f.elements.serviceOther.value=known?'':b.service}else{f.elements.eventDate.value=new Date().toISOString().slice(0,10);const p=data.prices[0];if(p){f.elements.serviceSelection.value=p.name;f.elements.servicePrice.value=p.price}}toggleOtherService();updateTotals();$('#bookingDialog').showModal()}
 function updateTotals(){const f=$('#bookingForm'),c=calc({servicePrice:f.elements.servicePrice.value,travelPrice:f.elements.travelPrice.value,depositAmount:f.elements.depositAmount.value,depositStatus:f.elements.depositStatus.value});$('#liveTotals').innerHTML=`<span>סה״כ<strong>${money(c.total)}</strong></span><span>שולם<strong>${money(c.paid)}</strong></span><span>יתרה לתשלום<strong>${money(c.balance)}</strong></span>`}
-function submitBooking(){const f=$('#bookingForm'),obj=Object.fromEntries(new FormData(f)),isOther=obj.serviceSelection==='אחר';obj.service=isOther?obj.serviceOther.trim():obj.serviceSelection;obj.serviceIsOther=String(isOther);delete obj.serviceSelection;delete obj.serviceOther;if(!obj.service){toast('יש לציין את סוג השירות');return}if(!Number.isInteger(Number(obj.makeupCount))||Number(obj.makeupCount)<1){toast('יש להזין כמות מאופרות תקינה');return}obj.id=obj.id||crypto.randomUUID();obj.updatedAt=new Date().toISOString();const i=data.bookings.findIndex(x=>x.id===obj.id);if(i>=0)data.bookings[i]={...data.bookings[i],...obj};else{obj.createdAt=obj.updatedAt;data.bookings.push(obj)}save(`${i>=0?'עודכנה':'נוצרה'} הזמנה עבור ${obj.clientName}`);toast('ההזמנה נשמרה')}
+function submitBooking(){const f=$('#bookingForm'),obj=Object.fromEntries(new FormData(f)),isOther=obj.serviceSelection==='אחר';obj.service=isOther?obj.serviceOther.trim():obj.serviceSelection;obj.serviceIsOther=String(isOther);delete obj.serviceSelection;delete obj.serviceOther;if(!obj.service){toast('יש לציין את סוג השירות');return}if(!syncBookingClient(obj))return;if(!Number.isInteger(Number(obj.makeupCount))||Number(obj.makeupCount)<1){toast('יש להזין כמות מאופרות תקינה');return}obj.id=obj.id||crypto.randomUUID();obj.updatedAt=new Date().toISOString();const i=data.bookings.findIndex(x=>x.id===obj.id);if(i>=0)data.bookings[i]={...data.bookings[i],...obj};else{obj.createdAt=obj.updatedAt;data.bookings.push(obj)}save(`${i>=0?'עודכנה':'נוצרה'} הזמנה עבור ${obj.clientName}`);toast('ההזמנה נשמרה')}
 const dateHe=value=>value?new Date(`${value}T12:00:00`).toLocaleDateString('he-IL'):'לא נקבע';
 const safeFileName=value=>String(value||'לקוחה').trim().replace(/[\\/:*?"<>|]+/g,'-').replace(/\s+/g,'-');
 function agreementHtml(b){const c=calc(b),created=dateHe((b.createdAt||'').slice(0,10));return `<section class="agreement" id="agreement-${b.id}" dir="rtl">
@@ -382,6 +483,13 @@ window.duplicateBooking=id=>{const source=data.bookings.find(x=>x.id===id),b={..
 function priceList(){$('#priceContent').innerHTML=`<div class="dialog-head"><div><p class="eyebrow">הגדרות</p><h2>מחירון</h2></div><button class="close" onclick="priceDialog.close()">×</button></div><div id="prices">${data.prices.map(p=>`<div class="price-row"><input value="${esc(p.name)}" data-id="${p.id}" data-k="name"><input type="number" value="${p.price}" data-id="${p.id}" data-k="price"><button class="secondary" data-del="${p.id}">מחיקה</button></div>`).join('')}</div><div class="dialog-actions"><button class="secondary" id="addPrice">הוספת שירות</button><button class="primary" id="savePrices">שמירה</button></div>`;$('#priceDialog').showModal();$('#addPrice').onclick=()=>{data.prices.push({id:crypto.randomUUID(),name:'שירות חדש',price:0});priceList()};$('#prices').onclick=e=>{if(e.target.dataset.del){data.prices=data.prices.filter(p=>p.id!==e.target.dataset.del);priceList()}};$('#savePrices').onclick=()=>{$('#prices').querySelectorAll('input').forEach(i=>{const p=data.prices.find(x=>x.id===i.dataset.id);p[i.dataset.k]=i.dataset.k==='price'?Number(i.value):i.value});save('המחירון עודכן');$('#priceDialog').close();toast('המחירון נשמר')}}
 function backup(){const blob=new Blob([JSON.stringify({...data,exportedAt:new Date().toISOString()},null,2)],{type:'application/json'}),a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download=`ayelet-miller-backup-${new Date().toISOString().slice(0,10)}.json`;a.click();URL.revokeObjectURL(a.href);toast('קובץ הגיבוי הורד')}
 function settings(){$('#settingsContent').innerHTML=`<div class="dialog-head"><div><p class="eyebrow">גישה מכל מכשיר</p><h2>סנכרון וגיבוי</h2></div><button class="close" onclick="settingsDialog.close()">×</button></div><p>${cloudSession?'הסנכרון המאובטח פעיל. הנתונים זמינים בכל מכשיר עם אותה כתובת מייל.':'כרגע המידע נשמר במכשיר זה בלבד.'}</p><div class="detail-actions"><button class="primary" id="exportNow">הורדת גיבוי</button><button class="secondary" id="restoreNow">שחזור מגיבוי</button>${cloudSession?'<button class="secondary" id="logoutNow">יציאה מהחשבון</button>':''}</div>${cloudSession?'<div style="margin-top:16px"><p><strong>כניסה מאובטחת במכשיר</strong></p><p>לאחר רישום חד־פעמי תוכלו להיכנס באמצעות Face ID, Touch ID או קוד המכשיר. הכניסה במייל תישאר זמינה.</p><button class="primary" id="registerPasskeyBtn" type="button">הפעלת Face ID / Touch ID למכשיר</button></div>':''}<div style="border-top:1px solid #eadde2;margin-top:16px;padding-top:14px"><p><strong>הגדרת סיסמה כגיבוי ל-Face ID</strong></p><p style="color:#766d71;font-size:.85rem">יש להגדיר סיסמה בנפרד לכל חשבון. היא נשמרת אצל Supabase ולא באפליקציה.</p><form id="setPasswordForm" autocomplete="off"><label style="display:block">סיסמה חדשה (12 תווים לפחות)<input name="newPassword" type="password" minlength="12" autocomplete="new-password" required style="display:block;width:100%;padding:12px;margin:6px 0 12px"></label><label style="display:block">אימות סיסמה<input name="confirmPassword" type="password" minlength="12" autocomplete="new-password" required style="display:block;width:100%;padding:12px;margin:6px 0 12px"></label><button type="submit" class="secondary">שמירת הסיסמה לחשבון</button><p id="setPasswordFeedback" role="status" aria-live="polite"></p></form></div>`;$('#settingsDialog').showModal();if($('#registerPasskeyBtn'))$('#registerPasskeyBtn').onclick=registerDevicePasskey;if($('#setPasswordForm'))$('#setPasswordForm').addEventListener('submit',async event=>{event.preventDefault();await setAccountPassword()});$('#exportNow').onclick=backup;$('#restoreNow').onclick=()=>$('#restoreInput').click();if($('#logoutNow'))$('#logoutNow').onclick=async()=>{await cloud.auth.signOut();cloudSession=null;idleWrite(IDLE_LOCK_KEY,'0');$('#settingsDialog').close();if(!$('#loginDialog').open)$('#loginDialog').showModal()}}
+$('#clientForm').addEventListener('submit',submitClient);
+$('#newClientBtn').onclick=()=>openClient();
+$('#clientSearch').oninput=renderClients;
+$('#clientList').onclick=e=>{const id=e.target.closest('[data-edit-client]')?.dataset.editClient;if(id)openClient(id)};
+$('#birthdayList').onclick=e=>{const id=e.target.closest('[data-birthday]')?.dataset.birthday;if(id)birthdayWhatsApp(id)};
+$('#birthdaySettingsBtn').onclick=editBirthdaySettings;
+document.querySelectorAll('.bottom-nav [data-view]').forEach(b=>b.onclick=()=>setView(b.dataset.view));
 $('#todayLabel').textContent=new Date().toLocaleDateString('he-IL',{weekday:'long',day:'numeric',month:'long'});
 $('#newBookingBtn').onclick=()=>openBooking();$('#bookingForm').addEventListener('submit',submitBooking);$('#bookingForm').addEventListener('input',updateTotals);$('#serviceSelect').onchange=e=>{toggleOtherService();const o=e.target.selectedOptions[0];if(o.dataset.price)$('#bookingForm').elements.servicePrice.value=o.dataset.price;updateTotals()};document.querySelectorAll('[data-close]').forEach(b=>b.onclick=()=>b.closest('dialog').close());$('#searchInput').oninput=renderList;$('#statusFilter').onchange=renderList;$('#bookingList').onclick=e=>{const el=e.target.closest('.booking');if(el)detail(el.dataset.id)};$('#bookingList').onkeydown=e=>{if(e.key==='Enter')detail(e.target.closest('.booking')?.dataset.id)};$('#priceListBtn').onclick=priceList;$('#backupBtn').onclick=backup;$('#settingsBtn').onclick=settings;$('#restoreInput').onchange=async e=>{try{const restored=JSON.parse(await e.target.files[0].text());if(!Array.isArray(restored.bookings)||!Array.isArray(restored.prices))throw 0;data={...seed,...restored};save('שוחזר גיבוי');toast('הגיבוי שוחזר בהצלחה')}catch{toast('קובץ הגיבוי אינו תקין')}};
 services();render();
