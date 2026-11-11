@@ -7,9 +7,30 @@ let cloud=null,cloudSession=null,syncTimer=null;
 const $=s=>document.querySelector(s), money=n=>new Intl.NumberFormat('he-IL',{style:'currency',currency:'ILS',maximumFractionDigits:0}).format(Number(n)||0);
 const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 function load(){try{return {...structuredClone(seed),...JSON.parse(localStorage.getItem(STORE)||'{}')}}catch{return structuredClone(seed)}}
-function save(action='עדכון נתונים'){data.history.unshift({id:crypto.randomUUID(),at:new Date().toISOString(),action});data.history=data.history.slice(0,250);localStorage.setItem(STORE,JSON.stringify(data));render();syncCloud()}
-function syncCloud(){if(!cloudSession||!cloud)return;clearTimeout(syncTimer);syncTimer=setTimeout(async()=>{const {error}=await cloud.from('app_state').upsert({workspace_id:'main',user_id:cloudSession.user.id,payload:data,updated_at:new Date().toISOString()},{onConflict:'workspace_id'});toast(error?'השמירה בענן נכשלה — נשמר גיבוי במכשיר':'נשמר בענן')},350)}
-async function loadCloud(){const {data:row,error}=await cloud.from('app_state').select('payload').eq('workspace_id','main').maybeSingle();if(error){toast('הגישה למאגר לא אושרה');return}if(row?.payload){data={...structuredClone(seed),...row.payload};localStorage.setItem(STORE,JSON.stringify(data));render();toast('הנתונים סונכרנו')}else syncCloud()}
+let localRevision=0,cloudWriteQueue=Promise.resolve(),pendingCloudWrite=false;
+function save(action='עדכון נתונים'){data.history.unshift({id:crypto.randomUUID(),at:new Date().toISOString(),action});data.history=data.history.slice(0,250);localRevision++;pendingCloudWrite=true;localStorage.setItem(STORE,JSON.stringify(data));render();return syncCloud()}
+function syncCloud(){
+  if(!cloudSession||!cloud){toast('נשמר במכשיר בלבד — אין חיבור לענן');return Promise.resolve(false)}
+  const snapshot=structuredClone(data),revision=localRevision;
+  cloudWriteQueue=cloudWriteQueue.catch(()=>false).then(async()=>{
+    try{
+      const {error}=await cloud.from('app_state').upsert({workspace_id:'main',user_id:cloudSession.user.id,payload:snapshot,updated_at:new Date().toISOString()},{onConflict:'workspace_id'});
+      if(error)throw error;
+      if(revision===localRevision)pendingCloudWrite=false;
+      toast('השינויים נשמרו בענן בהצלחה');
+      return true;
+    }catch(error){console.error('Cloud save failed',error);toast('שגיאה בשמירה בענן — הנתונים נשמרו במכשיר בלבד');return false}
+  });
+  return cloudWriteQueue;
+}
+async function loadCloud(){
+  const revisionAtStart=localRevision;
+  const {data:row,error}=await cloud.from('app_state').select('payload').eq('workspace_id','main').maybeSingle();
+  if(error){toast('הגישה למאגר לא אושרה');return}
+  if(revisionAtStart!==localRevision||pendingCloudWrite){console.warn('Cloud load skipped to protect unsynced local edits');return}
+  if(row?.payload){data={...structuredClone(seed),...row.payload};localStorage.setItem(STORE,JSON.stringify(data));render();toast('הנתונים סונכרנו')}
+  else syncCloud()
+}
 async function initCloud(){
   if(['127.0.0.1','localhost'].includes(location.hostname)){document.documentElement.classList.add('auth-ready');return}
   if(!window.supabase){toast('אין חיבור לשירות הנתונים');$('#loginDialog').showModal();document.documentElement.classList.add('auth-ready');return}
@@ -287,7 +308,7 @@ function openClient(id){
   $('#clientHistory').textContent=c?'הזמנות קודמות: '+data.bookings.filter(b=>b.clientId===c.id).map(b=>b.eventDate+' · '+b.service).join(' | '):'';
   $('#clientDialog').showModal();
 }
-function submitClient(e){
+async function submitClient(e){
   e.preventDefault();const f=e.currentTarget,o=Object.fromEntries(new FormData(f)),id=o.id,phone=normalizePhone(o.phone);o.services=Array.from(f.querySelectorAll('[name="services"]:checked'),el=>el.value);o.birthday=o.birthMonth&&o.birthDay?o.birthMonth+'-'+o.birthDay:'';delete o.birthMonth;delete o.birthDay;delete o.type;
   if(!phone){const el=f.elements.phone;el.setCustomValidity('יש להזין מספר נייד ישראלי תקין בן 10 ספרות');el.reportValidity();el.focus();return}
   o.fullName=o.fullName.trim().replace(/\s+/g,' ');
@@ -302,7 +323,7 @@ function submitClient(e){
   const c={...old,...o,id:id||crypto.randomUUID(),createdAt:old?.createdAt||new Date().toISOString(),updatedAt:new Date().toISOString()};
   if(old)Object.assign(old,c);else data.clients.push(c);
   if(old)for(const b of data.bookings.filter(b=>b.clientId===id)){b.clientName=c.fullName;b.phone=c.phone;b.email=c.email}
-  $('#clientDialog').close();$('#clientSearch').value='';setView('clients');save('עודכן כרטיס לקוחה: '+c.fullName);toast('הלקוחה נשמרה ומופיעה במאגר');
+  $('#clientDialog').close();$('#clientSearch').value='';setView('clients');toast('הלקוחה נשמרה במכשיר, מעדכנים את הענן...');await save('עודכן כרטיס לקוחה: '+c.fullName);
 }
 function syncBookingClient(obj){
   ensureClients();const phone=normalizePhone(obj.phone);
@@ -340,7 +361,13 @@ function editBirthdaySettings(){
 }
 
 function calc(b){const total=Number(b.servicePrice||0)+Number(b.travelPrice||0),paid=b.depositStatus==='שולמה'?Number(b.depositAmount||0):0;return {total,paid,balance:Math.max(0,total-paid)}}
-function toast(t){const el=$('#toast');el.textContent=t;el.classList.add('show');setTimeout(()=>el.classList.remove('show'),2200)}
+let toastTimeout;
+function toast(t){
+ const dialog=Array.from(document.querySelectorAll('dialog[open]')).at(-1);
+ const el=dialog?.querySelector('.dialog-feedback')||$('#toast');
+ el.textContent=t;el.classList.add('show');clearTimeout(toastTimeout);
+ toastTimeout=setTimeout(()=>{el.classList.remove('show');if(el.classList.contains('dialog-feedback'))el.textContent=''},4500)
+}
 function render(){ensureClients();const now=new Date(),upcoming=data.bookings.filter(b=>b.status!=='בוטלה'&&new Date(`${b.eventDate}T${b.eventTime||'00:00'}`)>=new Date(now.toDateString())).sort((a,b)=>a.eventDate.localeCompare(b.eventDate));const open=data.bookings.filter(b=>!['הושלמה','בוטלה'].includes(b.status));const due=open.reduce((n,b)=>n+calc(b).balance,0);$('#stats').innerHTML=`<div class="stat"><span>אירועים קרובים</span><strong>${upcoming.length}</strong></div><div class="stat"><span>הזמנות פעילות</span><strong>${open.length}</strong></div><div class="stat"><span>לקוחות</span><strong>${data.clients.length}</strong></div><div class="stat"><span>יתרות פתוחות</span><strong>${money(due)}</strong></div>`;renderList();if(activeView==='clients')renderClients()}
 function renderList(){const q=$('#searchInput').value.trim().toLowerCase(),sf=$('#statusFilter').value;const items=data.bookings.filter(b=>(!q||b.clientName.toLowerCase().includes(q)||b.phone.replace(/\D/g,'').includes(q.replace(/\D/g,'')))&&(!sf||b.status===sf)).sort((a,b)=>`${a.eventDate}${a.eventTime}`.localeCompare(`${b.eventDate}${b.eventTime}`));$('#emptyState').hidden=items.length>0;$('#bookingList').innerHTML=items.map(b=>{const d=new Date(`${b.eventDate}T12:00:00`),c=calc(b);return `<article class="booking" data-id="${b.id}" tabindex="0"><div class="datebox"><strong>${d.getDate()}</strong><span>${d.toLocaleDateString('he-IL',{month:'short'})}</span></div><div class="meta"><strong>${esc(b.clientName)}</strong><small>${esc(b.phone)} · ${esc(b.location||'ללא מיקום')}</small></div><div class="service">${esc(b.service)}</div><div class="money">${money(c.balance)}<small> יתרה</small></div><span class="badge ${b.status==='הושלמה'?'done':''}">${esc(b.status)}</span></article>`}).join('')}
 function services(){const s=$('#serviceSelect');s.innerHTML=data.prices.map(p=>`<option value="${esc(p.name)}" data-price="${p.price}">${esc(p.name)}</option>`).join('')+`<option value="אחר">אחר</option>`}
