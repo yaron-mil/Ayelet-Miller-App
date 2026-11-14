@@ -1,7 +1,8 @@
 const STORE='ayelet-miller-v1';
 const SUPABASE_URL='https://tvoriihijpwrxdnayfdq.supabase.co';
 const SUPABASE_KEY='eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InR2b3JpaWhpanB3cnhkbmF5ZmRxIiwicm9sZSI6ImFub24iLCJpYXQiOjE3OTEyMTMwMjcsImV4cCI6MjEwNjc4OTAyN30.f-Bp99AbxVT-WYHtbaR48NvqU9mDfyOVJFRf34Ks91s';
-const seed={clients:[],birthdaySettings:{daysAhead:7,message:'מזל טוב {name}! 🎉🎂 מאחלת לך שנה נפלאה מלאה בשמחה וביופי ❤️ לכבוד יום הולדתך מחכה לך הטבה מיוחדת ממני 💄',offer:'',terms:''},birthdaySent:{},bookings:[],prices:[{id:'p1',name:'איפור כלה',price:1800},{id:'p2',name:'איפור ערב',price:450},{id:'p3',name:'ליווי לאירוע',price:900}],history:[]};
+const DEFAULT_AGREEMENT_MESSAGE='שלום {name}, מצורף הסכם שירותי האיפור של איילת מילר. אשמח שתעייני בהסכם ותחזירי אותו חתום. תודה רבה!';
+const seed={agreementMessage:DEFAULT_AGREEMENT_MESSAGE,clients:[],birthdaySettings:{daysAhead:7,message:'מזל טוב {name}! 🎉🎂 מאחלת לך שנה נפלאה מלאה בשמחה וביופי ❤️ לכבוד יום הולדתך מחכה לך הטבה מיוחדת ממני 💄',offer:'',terms:''},birthdaySent:{},bookings:[],prices:[{id:'p1',name:'איפור כלה',price:1800},{id:'p2',name:'איפור ערב',price:450},{id:'p3',name:'ליווי לאירוע',price:900}],history:[]};
 let data=load();
 let cloud=null,cloudSession=null,syncTimer=null;
 const $=s=>document.querySelector(s), money=n=>new Intl.NumberFormat('he-IL',{style:'currency',currency:'ILS',maximumFractionDigits:0}).format(Number(n)||0);
@@ -43,7 +44,7 @@ function save(action='עדכון נתונים'){
     }
     if(collection==='bookings')for(const id of before.keys())if(!after.has(id)&&!pendingOps.some(op=>op.kind==='booking-delete'&&op.id===id))queueOperation('booking-delete',id);
   }
-  for(const key of ['prices','birthdaySettings','birthdaySent'])if(JSON.stringify(lastSavedSnapshot[key])!==JSON.stringify(data[key]))queueOperation('state-update',key,data[key]);
+  for(const key of ['prices','birthdaySettings','birthdaySent','agreementMessage'])if(JSON.stringify(lastSavedSnapshot[key])!==JSON.stringify(data[key]))queueOperation('state-update',key,data[key]);
   lastSavedSnapshot=structuredClone(data);
   data.history.unshift({id:crypto.randomUUID(),at:new Date().toISOString(),action});
   data.history=data.history.slice(0,250);
@@ -461,6 +462,7 @@ function agreementHtml(b){const c=calc(b),created=dateHe((b.createdAt||'').slice
       ${b.travelLocation?`<div class="agreement-field-wide"><strong>מיקום הנסיעה</strong><span>${esc(b.travelLocation)}</span></div>`:""}
       <div><strong>אמצעי תשלום</strong><span>${esc(b.paymentMethod||"טרם נקבע")}</span></div>
       <div><strong>מקדמה ששולמה</strong><span>${money(c.paid)}</span></div>
+      ${b.depositDate&&b.depositStatus==='שולמה'?`<div><strong>תאריך תשלום המקדמה</strong><span>${esc(dateHe(b.depositDate))}</span></div>`:""}
       ${b.depositDetails?`<div class="agreement-field-wide"><strong>פירוט מקדמה</strong><span>${esc(b.depositDetails).replace(/\n/g,"<br>")}</span></div>`:""}
     </div>
     <div class="agreement-payment-total"><div><strong>סה״כ לתשלום</strong><span>${money(c.total)}</span></div><div><strong>יתרה לתשלום</strong><span>${money(c.balance)}</span></div></div>
@@ -544,7 +546,7 @@ async function shareAgreement(id){
 async function shareAgreementWhatsApp(id){
  const b=data.bookings.find(x=>x.id===id);
  if(!b){toast('ההזמנה לא נמצאה');return}
- const message='שלום '+b.clientName+', מצורף הסכם שירותי האיפור של איילת מילר. אשמח שתעייני בהסכם ותחזירי אותו חתום. תודה רבה!';
+ const message=String(data.agreementMessage??DEFAULT_AGREEMENT_MESSAGE).replace(/\{name\}/g,()=>b.clientName||'');
  toast('מכינה PDF והודעה ל-WhatsApp...');
  const result=await createAgreementPdf(id);
  if(!result)return;
@@ -577,6 +579,23 @@ $('#birthdaySettingsBtn').onclick=editBirthdaySettings;
 document.querySelectorAll('.bottom-nav [data-view]').forEach(b=>b.addEventListener('click',()=>setView(b.dataset.view)));
 $('#todayLabel').textContent=new Date().toLocaleDateString('he-IL',{weekday:'long',day:'numeric',month:'long'});
 $('#newBookingBtn').onclick=()=>openBooking();$('#bookingForm').addEventListener('submit',submitBooking);$('#bookingForm').addEventListener('input',updateTotals);$('#serviceSelect').onchange=e=>{toggleOtherService();const o=e.target.selectedOptions[0];if(o.dataset.price)$('#bookingForm').elements.servicePrice.value=o.dataset.price;updateTotals()};document.querySelectorAll('[data-close]').forEach(b=>b.onclick=()=>b.closest('dialog').close());$('#searchInput').oninput=renderList;$('#statusFilter').onchange=renderList;$('#bookingList').onclick=e=>{const el=e.target.closest('.booking');if(el)detail(el.dataset.id)};$('#bookingList').onkeydown=e=>{if(e.key==='Enter')detail(e.target.closest('.booking')?.dataset.id)};$('#priceListBtn').onclick=priceList;$('#backupBtn').onclick=backup;$('#settingsBtn').onclick=settings;$('#restoreInput').onchange=async e=>{try{const restored=JSON.parse(await e.target.files[0].text());if(!Array.isArray(restored.bookings)||!Array.isArray(restored.prices))throw 0;data={...seed,...restored};save('שוחזר גיבוי');toast('הגיבוי שוחזר בהצלחה')}catch{toast('קובץ הגיבוי אינו תקין')}};
+$('#agreementMessageBtn').onclick=()=>{
+  $('#agreementMessageText').value=data.agreementMessage??DEFAULT_AGREEMENT_MESSAGE;
+  $('#agreementMessageFeedback').textContent='';
+  $('#agreementMessageDialog').showModal();
+};
+$('#agreementMessageReset').onclick=()=>{$('#agreementMessageText').value=DEFAULT_AGREEMENT_MESSAGE;$('#agreementMessageText').focus()};
+$('#agreementMessageForm').addEventListener('submit',async e=>{
+  e.preventDefault();
+  const value=$('#agreementMessageText').value.trim();
+  if(!value){$('#agreementMessageFeedback').textContent='יש להזין נוסח הודעה';return}
+  const button=$('#agreementMessageSave');button.disabled=true;
+  try{data.agreementMessage=value;$('#agreementMessageFeedback').textContent='שומרת...';
+    const ok=await save('עודכן נוסח הודעת WhatsApp להסכם');
+    if(ok){$('#agreementMessageDialog').close();toast('נוסח ההודעה נשמר בענן בהצלחה')}
+    else $('#agreementMessageFeedback').textContent='הנוסח נשמר במכשיר בלבד. הסנכרון לענן טרם הצליח.';
+  }finally{button.disabled=false}
+});
 services();render();
 function emailLoginFeedback(message,success=false){
   const panel=$('#loginEmailFeedback');
