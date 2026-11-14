@@ -32,6 +32,7 @@
     </section>
 
     <section class="stats" id="stats"></section>
+    <section class="panel" style="margin-bottom:16px"><div class="section-head" style="align-items:center;margin-bottom:0;gap:12px;flex-wrap:wrap"><div><h2>הודעת WhatsApp להסכם</h2><p>הקדמה אישית שתצורף בעת שיתוף החוזה</p></div><button type="button" class="secondary" id="agreementMessageBtn">עריכת הודעה ללקוחה</button></div></section>
 
     <section class="toolbar">
       <label class="search"><span>⌕</span><input id="searchInput" type="search" placeholder="חיפוש לפי שם או טלפון"></label>
@@ -100,6 +101,7 @@
         <label>נסיעות<input name="travelPrice" type="number" min="0" step="1" value="0"></label>
         <label>מיקום הנסיעות<input name="travelLocation" placeholder="לדוגמה: הגעה לעכו"></label>
         <label>מקדמה<input name="depositAmount" type="number" min="0" step="1" value="0"></label>
+        <label>תאריך תשלום המקדמה<input name="depositDate" type="date"></label>
         <label class="wide">פירוט מקדמה<textarea name="depositDetails" rows="2" placeholder="לדוגמה: שולמה מקדמה 100 ש״ח דרך פייבוקס"></textarea></label>
         <label>סטטוס מקדמה<select name="depositStatus"><option>לא שולמה</option><option>שולמה</option></select></label>
         <label>אמצעי תשלום<select name="paymentMethod"><option value="">לא נבחר</option><option>העברה בנקאית</option><option>ביט</option><option>פייבוקס</option><option>מזומן</option><option>אשראי</option><option>אחר</option></select></label>
@@ -112,6 +114,15 @@
     </form>
   </dialog>
 
+  <dialog id="agreementMessageDialog">
+    <form id="agreementMessageForm">
+      <div class="dialog-head"><div><p class="eyebrow">AYELET MILLER · WhatsApp</p><h2>עריכת הודעה ללקוחה</h2></div><button type="button" class="close" data-close aria-label="סגירה">×</button></div>
+      <div class="form-grid"><label class="wide">נוסח ההודעה<textarea id="agreementMessageText" rows="7" required maxlength="3000"></textarea></label></div>
+      <p style="color:#766d71;font-size:.9rem;line-height:1.6">אפשר לכתוב {name} במקום שבו תרצי שיופיע שם הלקוחה באופן אוטומטי. ניתן להוסיף אימוג׳ים ושורות חדשות.</p>
+      <p id="agreementMessageFeedback" role="status" aria-live="polite" style="color:#87163c;font-weight:700"></p>
+      <div class="dialog-actions" style="flex-wrap:wrap"><button type="button" class="secondary" id="agreementMessageReset">שחזור נוסח מקורי</button><button type="button" class="secondary" data-close>ביטול</button><button type="submit" class="primary" id="agreementMessageSave">שמירת נוסח</button></div>
+    </form>
+  </dialog>
   <dialog id="detailsDialog"><div id="detailsContent"></div></dialog>
   <dialog id="priceDialog"><div id="priceContent"></div></dialog>
   <dialog id="settingsDialog"><div id="settingsContent"></div></dialog>
@@ -156,6 +167,6 @@
   <div id="toast" role="status" aria-live="polite"></div>
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.105.0"></script>
   <script src="html2pdf.bundle.min.js"></script>
-  <script src="app.js?v=20261112-toast-short-1"></script>
+  <script src="app.js?v=20261114-deposit-message-1"></script>
 </body>
 </html>
