@@ -88,17 +88,23 @@
       <div class="form-grid">
         <label class="wide">תאריך הזמנת השירות<input name="bookingDate" type="date" required></label>
         <label>שם הלקוחה<input name="clientName" required autocomplete="name"></label>
-        <label>הזמנת שירות בתאריך<input name="eventDate" type="date" required></label>
+        <label><span id="eventDateLabel">הזמנת שירות בתאריך</span><input name="eventDate" type="date" required></label>
         <label>טלפון<input name="phone" required inputmode="tel" autocomplete="tel"></label>
         <label class="wide">דוא״ל <small>יופיע בהסכם אם הוזן</small><input name="email" type="email" inputmode="email" autocomplete="email"></label>
-        <label>שעה<input name="eventTime" type="time"></label>
+        <label><span id="eventTimeLabel">שעה</span><input name="eventTime" type="time"></label>
         <label class="wide">מלל חופשי לשעה<input name="eventTimeText" placeholder="למשל: 12:00–13:00 (האיפור סביב שעה וקצת)"></label>
-        <label class="wide">מיקום<input name="location"></label>
+        <label class="wide"><span id="locationLabel">מיקום</span><input name="location"></label>
         <label class="wide">סוג השירות<select name="serviceSelection" id="serviceSelect"></select></label>
         <label class="wide">פירוט השירות<textarea name="serviceDetails" rows="2" placeholder="לדוגמה: איפור + ריסים"></textarea></label>
-        <label>כמות מאופרות<input name="makeupCount" type="number" min="1" step="1" value="1" required></label>
+        <label id="makeupCountField">כמות מאופרות<input name="makeupCount" type="number" min="1" step="1" value="1" required></label>
+        <div id="courseFields" class="wide" hidden><div class="form-grid">
+          <label>מספר מפגשים<input name="courseSessions" type="number" min="1" step="1"></label>
+          <label>סך שעות לימוד<input name="courseHours" type="number" min="0.5" step="0.5"></label>
+          <label class="wide">לוח מפגשים<textarea name="courseSchedule" rows="2" placeholder="ימים, תאריכים ושעות"></textarea></label>
+          <label class="wide">ציוד וחומרי לימוד כלולים<textarea name="courseMaterials" rows="2"></textarea></label>
+        </div></div>
         <label>מחיר השירות<input name="servicePrice" type="number" min="0" step="1"></label>
-        <label>נסיעות<input name="travelPrice" type="number" min="0" step="1" value="0"></label>
+        <label id="travelPriceField">נסיעות<input name="travelPrice" type="number" min="0" step="1" value="0"></label>
         <label>מקדמה<input name="depositAmount" type="number" min="0" step="1" value="0"></label>
         <label>תאריך תשלום המקדמה<input name="depositDate" type="date"></label>
         <label class="wide">פירוט מקדמה<textarea name="depositDetails" rows="2" placeholder="לדוגמה: שולמה מקדמה 100 ש״ח דרך פייבוקס"></textarea></label>
@@ -166,6 +172,6 @@
   <div id="toast" role="status" aria-live="polite"></div>
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.105.0"></script>
   <script src="html2pdf.bundle.min.js"></script>
-  <script src="app.js?v=20261115-booking-fields-1"></script>
+  <script src="app.js?v=20261115-course-agreement-1"></script>
 </body>
 </html>
