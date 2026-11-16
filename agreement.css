@@ -36,3 +36,21 @@
 .agreement-terms>p,.agreement-terms>h3{break-inside:avoid}
 .agreement-terms>p:first-of-type{color:#87163C;font-weight:700;border-right:3px solid #87163C;padding:9px 13px;background:#fbf7f8}
 @media(max-width:560px){.agreement-fields{grid-template-columns:1fr}.agreement-payment-total{flex-direction:column}}
+
+/* PDF layout is independent of the phone viewport. */
+.agreement{font-family:Arial,"Noto Sans Hebrew",sans-serif;word-spacing:normal;letter-spacing:normal;text-align:right}
+.agreement-pdf{width:100%;max-width:none;box-sizing:border-box;padding:20px 24px;border:0;border-radius:0;font-size:14px;line-height:1.45;direction:rtl}
+.agreement-pdf .agreement-header{display:flex;flex-direction:row;text-align:right;gap:18px;padding-bottom:10px;margin-bottom:12px}
+.agreement-pdf .agreement-logo{width:180px;max-height:68px;margin:0}
+.agreement-pdf h1{font-size:22px;text-align:right;line-height:1.35}
+.agreement-pdf h2{font-size:16px;margin:12px 0 7px}
+.agreement-pdf h3{font-size:14px;margin:12px 0 4px}
+.agreement-pdf .agreement-block{margin:12px 0;break-inside:auto}
+.agreement-pdf .agreement-fields{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:7px 18px;font-size:13px}
+.agreement-pdf .agreement-fields>div{gap:2px;overflow-wrap:break-word;break-inside:avoid}
+.agreement-pdf .agreement-payment-total{flex-direction:row;margin-top:10px;padding:9px 12px}
+.agreement-pdf .agreement-terms p{margin:5px 0;font-size:13px;line-height:1.45}
+.agreement-pdf .signature-row{grid-template-columns:repeat(3,minmax(0,1fr));gap:12px;margin:22px 0 16px}
+.agreement-pdf .signature-row div{gap:10px}
+.agreement-pdf .agreement-note{margin-top:10px}
+.agreement-pdf .agreement-footer{font-size:11px}
