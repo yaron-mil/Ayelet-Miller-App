@@ -522,7 +522,7 @@ function courseAgreementHtml(b){
  ${b.agreementNotes?'<h3>תנאים נוספים שסוכמו</h3><p>'+esc(b.agreementNotes).replace(/\n/g,'<br>')+'</p>':''}
  </div><div class="signature-row"><div><span>חתימת נותנת השירות</span><b>________________</b></div><div><span>חתימת התלמידה</span><b>________________</b></div><div><span>תאריך</span><b>________________</b></div></div><footer class="agreement-footer">AYELET MILLER · הסכם הרשמה לקורס</footer></section>`;
 }
-function agreementOptions(b){return {margin:[10,10,10,10],filename:`הסכם-${isCourseBooking(b)?'קורס-':''}${safeFileName(b.clientName)}-${b.eventDate||new Date().toISOString().slice(0,10)}.pdf`,image:{type:'jpeg',quality:.98},html2canvas:{scale:2,useCORS:true,backgroundColor:'#ffffff',scrollY:0},jsPDF:{unit:'mm',format:'a4',orientation:'portrait'},pagebreak:{mode:['css','legacy'],avoid:['tr','.signature-row']}}}
+function agreementOptions(b){return {margin:[10,10,10,10],filename:`הסכם-${isCourseBooking(b)?'קורס-':''}${safeFileName(b.clientName)}-${b.eventDate||new Date().toISOString().slice(0,10)}.pdf`,image:{type:'jpeg',quality:.98},html2canvas:{scale:2,useCORS:true,backgroundColor:'#ffffff',scrollY:0,windowWidth:794},jsPDF:{unit:'mm',format:'a4',orientation:'portrait'},pagebreak:{mode:['css','legacy'],avoid:['tr','.signature-row']}}}
 
 // Generate a real PDF file rather than asking iOS Safari to print a dynamically opened HTML page.
 async function createAgreementPdf(id){
@@ -531,15 +531,24 @@ async function createAgreementPdf(id){
  if(typeof html2pdf!=='function'){toast('רכיב יצירת PDF לא נטען. נסו לרענן את הדף');return null}
  const holder=document.createElement('div');
  holder.setAttribute('dir','rtl');
- holder.style.cssText='position:fixed;left:-10000px;top:0;width:794px;max-width:none;background:#fff;z-index:-1;pointer-events:none;';
+ holder.style.cssText='position:fixed;left:-10000px;top:0;width:718px;max-width:none;background:#fff;z-index:-1;pointer-events:none;';
  holder.innerHTML=agreementHtml(b);
+ const agreement=holder.querySelector('.agreement');
+ agreement.classList.add('agreement-pdf');
+ // Safari/html2canvas can collapse ordinary spaces in RTL text runs.
+ // Preserve visible spaces while retaining a line-break opportunity between words.
+ const walker=document.createTreeWalker(agreement,NodeFilter.SHOW_TEXT);
+ let node;
+ while((node=walker.nextNode())){
+   if(node.nodeValue.trim())node.nodeValue=node.nodeValue.replace(/([^\s]) +(?=[^\s])/g,'$1\u00a0\u200b');
+ }
  document.body.appendChild(holder);
  try{
    if(document.fonts&&document.fonts.ready)await document.fonts.ready;
    const images=Array.from(holder.querySelectorAll('img'));
    await Promise.all(images.map(img=>img.complete?Promise.resolve():new Promise(resolve=>{img.addEventListener('load',resolve,{once:true});img.addEventListener('error',resolve,{once:true})})));
    const options=agreementOptions(b);
-   options.pagebreak={mode:['css','legacy'],avoid:['.signature-row','.agreement-header','.agreement-payment-total']};
+   options.pagebreak={mode:['css','legacy'],avoid:['.signature-row','.agreement-header','.agreement-payment-total','.agreement-fields>div']};
    const blob=await html2pdf().set(options).from(holder.querySelector('.agreement')||holder).toPdf().outputPdf('blob');
    if(!blob||blob.size<1000)throw new Error('PDF was empty');
    return {blob,filename:options.filename};
